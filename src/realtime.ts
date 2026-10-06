@@ -107,7 +107,7 @@ export class RealtimeSession {
 
   start(): void {
     if (!this.#opts.apiKey) {
-      this.#setStatus("unconfigured", "localhostの設定画面でAPIキーを入力してください。");
+      this.#setStatus("unconfigured", "設定画面でAPIキーを入力してください。");
       return;
     }
     this.#setStatus("connecting");

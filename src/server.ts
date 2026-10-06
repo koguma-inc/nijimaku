@@ -286,12 +286,11 @@ server.on("upgrade", (req, socket, head) => {
     socket.end("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n");
     return;
   }
-  // Originの無い接続（Nodeのreplay.ts等）は許可する。同じPCの他のプロセスは信頼する前提。
-  // 設定の変更はlocalhostで開いたページからだけ受け付ける（共有用のトンネル経由のページからは変えさせない）
+  // Originの無い接続はcaptureとoverlayだけ許可する。同じPCの他のプロセスは信頼する前提。
   const origin = req.headers.origin;
   const allowed =
     wss === settingsWss
-      ? origin !== undefined && localOrigins.has(origin)
+      ? origin !== undefined && allowedOrigins.has(origin)
       : origin === undefined || allowedOrigins.has(origin);
   if (!allowed) {
     socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");

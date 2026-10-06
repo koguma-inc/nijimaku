@@ -20,7 +20,7 @@ async function freePort(): Promise<number> {
   return address.port;
 }
 
-test(".env・APIキーなしで画面を配信し、キーの状態はlocalhostにだけ返し、不正なキーを保存も出力もしない", { timeout: 15000 }, async (t) => {
+test(".env・APIキーなしで画面を配信し、許可URLから設定を変更でき、不正なキーを保存も出力もしない", { timeout: 15000 }, async (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
   const sockets: WebSocket[] = [];
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -57,7 +57,7 @@ test(".env・APIキーなしで画面を配信し、キーの状態はlocalhost�
   assert.equal((await fetch(httpBase)).status, 200);
   assert.equal((await fetch(`${httpBase}/credentials.json`)).status, 404);
 
-  for (const blockedOrigin of [undefined, "https://shared.example", "https://untrusted.example"]) {
+  for (const blockedOrigin of [undefined, "null", "https://untrusted.example"]) {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, {
       headers: blockedOrigin ? { Origin: blockedOrigin } : {},
     });
@@ -66,25 +66,46 @@ test(".env・APIキーなしで画面を配信し、キーの状態はlocalhost�
     assert.match(error.message, /403/);
   }
 
-  const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: origin } });
-  sockets.push(socket);
-  const messages: Record<string, unknown>[] = [];
-  let notify = () => {};
-  socket.on("message", (raw) => { messages.push(JSON.parse(raw.toString())); notify(); });
-  async function receive(type: string): Promise<Record<string, unknown>> {
-    for (;;) {
-      const message = messages.find((msg) => msg.type === type);
-      if (message) return message;
-      await new Promise<void>((resolve) => { notify = resolve; });
+  for (const allowedOrigin of [origin, httpBase, "https://shared.example"]) {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: allowedOrigin } });
+    sockets.push(socket);
+    const messages: Record<string, unknown>[] = [];
+    const pending: Record<string, unknown>[] = [];
+    let notify = () => {};
+    socket.on("message", (raw) => {
+      const message = JSON.parse(raw.toString());
+      messages.push(message);
+      pending.push(message);
+      notify();
+    });
+    async function receive(type: string): Promise<Record<string, unknown>> {
+      for (;;) {
+        const index = pending.findIndex((msg) => msg.type === type);
+        if (index !== -1) return pending.splice(index, 1)[0]!;
+        await new Promise<void>((resolve) => { notify = resolve; });
+      }
     }
+    const initial = await receive("settings");
+    const status = await receive("credentials.status");
+    assert.equal(status.configured, false);
+    assert.equal(status.saved, false);
+    assert.equal(status.state, "unconfigured");
+
+    socket.send(JSON.stringify({ type: "set", key: "displaySegments", value: 4 }));
+    const changed = await receive("settings");
+    assert.equal((changed.values as Record<string, unknown>).displaySegments, 4);
+    assert.equal(JSON.parse(readFileSync(path.join(dir, "settings.json"), "utf8")).displaySegments, 4);
+    socket.send(JSON.stringify({ type: "reset", key: "displaySegments" }));
+    const reset = await receive("settings");
+    assert.equal((reset.values as Record<string, unknown>).displaySegments, (initial.defaults as Record<string, unknown>).displaySegments);
+    assert.ok(!Object.hasOwn(JSON.parse(readFileSync(path.join(dir, "settings.json"), "utf8")), "displaySegments"));
+
+    socket.send(JSON.stringify({ type: "credentials.set", apiKey: `${secret} invalid` }));
+    const error = await receive("credentials.error");
+    assert.ok(!JSON.stringify({ messages, output }).includes(secret));
+    assert.match(String(error.message), /APIキー/);
+    assert.equal(readFileSync(path.join(dir, "credentials.json"), "utf8"), `{"openaiApiKey":"${secret}`);
+    socket.close();
+    await once(socket, "close");
   }
-  const status = await receive("credentials.status");
-  assert.equal(status.configured, false);
-  assert.equal(status.saved, false);
-  assert.equal(status.state, "unconfigured");
-  socket.send(JSON.stringify({ type: "credentials.set", apiKey: `${secret} invalid` }));
-  const error = await receive("credentials.error");
-  assert.ok(!JSON.stringify({ messages, output }).includes(secret));
-  assert.match(String(error.message), /APIキー/);
-  assert.equal(readFileSync(path.join(dir, "credentials.json"), "utf8"), `{"openaiApiKey":"${secret}`);
 });

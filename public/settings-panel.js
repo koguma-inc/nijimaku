@@ -50,14 +50,9 @@ function setSlider(slider, value) {
 }
 
 /**
- * @param {{card: HTMLElement, note: HTMLElement, message: HTMLElement, onValues: (values: Record<string, unknown>, styleVars: Record<string, string>) => void, onCredentials: (status: any) => void}} opts
+ * @param {{card: HTMLElement, message: HTMLElement, onValues: (values: Record<string, unknown>, styleVars: Record<string, string>) => void, onCredentials: (status: any) => void}} opts
  */
-export function mountSettings({ card, note, message, onValues, onCredentials }) {
-  // サーバーはlocalhostのページからの接続だけ受け付ける
-  if (location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
-    note.hidden = false;
-    return;
-  }
+export function mountSettings({ card, message, onValues, onCredentials }) {
   /** @type {Map<string, {field: any, input?: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, widget?: {el: HTMLElement, render: (value: any[]) => void}, reset: HTMLButtonElement, picker?: HTMLInputElement, slider?: HTMLInputElement}>} */
   const rows = new Map();
   /** @type {WebSocket | null} */
@@ -463,7 +458,8 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
   }
 
   function connect() {
-    const socket = new WebSocket(`ws://${location.host}/ws/settings`);
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(`${proto}//${location.host}/ws/settings`);
     ws = socket;
     socket.onopen = () => {
       backoff = BACKOFF_MIN_MS;

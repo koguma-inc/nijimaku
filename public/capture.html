@@ -913,12 +913,6 @@
         max-width: 640px;
       }
 
-      body.cap-page .cap-settings-off {
-        padding: 14px 18px;
-        border: 1px dashed var(--cap-border-strong);
-        border-radius: 12px;
-      }
-
       @keyframes cap-blink {
         50% {
           opacity: 0.25;
@@ -1127,13 +1121,12 @@
             <span class="cap-key-state" id="cap-api-key-state" role="status" aria-live="polite">接続中</span>
           </form>
           <div class="cap-key-actions">
-            <p class="cap-field-hint">APIキーはこのPCに保存されます。保存済みのキーは画面に表示されません。</p>
+            <p class="cap-field-hint">APIキーはサーバーを動かしているPCに保存されます。保存済みのキーは画面に表示されません。</p>
             <button type="button" class="cap-btn cap-btn-danger" id="cap-api-key-reset" hidden disabled>保存したキーを削除</button>
             <p class="cap-message" id="cap-api-key-message" role="status" aria-live="polite"></p>
           </div>
         </div>
       </section>
-      <p class="cap-note cap-settings-off" id="cap-settings-note" hidden>設定は http://localhost で開いたときだけ変えられます。</p>
     </div>
     <script type="module" src="./capture.js"></script>
   </body>

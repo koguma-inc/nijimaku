@@ -2,7 +2,7 @@
 // 値の優先順は「画面で保存した値 > .env > 既定値」。保存するのは画面で変えた項目だけ。
 //
 // WSのメッセージ:
-//   /ws/settings（localhostのページだけ）
+//   /ws/settings
 //     サーバー→ページ: {type: "settings", fields, values, defaults, overridden, styleVars}
 //                      {type: "settings.error", key?, message}
 //     ページ→サーバー: {type: "set", key, value} / {type: "reset", key}

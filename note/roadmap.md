@@ -18,4 +18,3 @@
 - 実APIとWindows実機で動作を確かめる。
 - VADの値（`VAD_THRESHOLD_DB`・`VAD_SILENCE_MS`）をマイクで決め直す。
 - captureのタブを非表示にしたまま音声が途切れないか。途切れる場合の運用をREADMEに書く。
-- `nr share`中は、`/ws/settings`への`Origin`の偽装を防げない（READMEの「セキュリティ上の前提」）。受け入れるか、対策するかを決める。

@@ -38,7 +38,7 @@ const messageEl = $("cap-message");
 /** @type {{stream: MediaStream, ctx: AudioContext, source: MediaStreamAudioSourceNode, node: AudioWorkletNode} | null} */
 let audio = null;
 let starting = false;
-let apiKeyConfigured = location.hostname === "localhost" || location.hostname === "127.0.0.1" ? false : null;
+let apiKeyConfigured = false;
 /** @type {WebSocket | null} */
 let ws = null;
 let retryTimer = 0;
@@ -47,7 +47,7 @@ let levelDb = -Infinity;
 let thresholdDb = NaN;
 let rtState = "-";
 let meterRaf = 0;
-// サーバーの設定（/ws/captureのcapture.config、localhostなら設定パネルからも届く）
+// サーバーの設定（/ws/captureのcapture.configと設定パネルから届く）
 let mic = { noiseSuppression: true, autoGainControl: true, echoCancellation: true };
 const MIC_KEYS = /** @type {const} */ (["noiseSuppression", "autoGainControl", "echoCancellation"]);
 
@@ -452,7 +452,6 @@ const updatePreview = mountPreview($("cap-preview"));
 
 mountSettings({
   card: $("cap-settings"),
-  note: $("cap-settings-note"),
   message: $("cap-settings-message"),
   onCredentials: (status) => {
     setupEl.hidden = status.configured;
