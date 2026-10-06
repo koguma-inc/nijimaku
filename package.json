@@ -1,5 +1,6 @@
 {
   "name": "nijimaku",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,6 +9,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.ts",
     "share": "node --env-file-if-exists=.env scripts/share.ts",
+    "dist": "node scripts/dist.ts",
     "typecheck": "tsc",
     "test": "node --test \"src/**/*.test.ts\""
   },
