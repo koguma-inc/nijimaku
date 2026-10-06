@@ -10,6 +10,7 @@ import { loadConfig, type Config } from "./config.ts";
 import { Corrector, type StreamContext } from "./corrector.ts";
 import { CredentialsStore } from "./credentials.ts";
 import { createLogger, createNoopLogger } from "./log.ts";
+import { openBrowser } from "./open-browser.ts";
 import { RealtimeSession, type TranscriptionConfig } from "./realtime.ts";
 import { SegmentStore, type Snapshot } from "./segments.ts";
 import { SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
@@ -409,8 +410,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 // --- 起動と終了 ---
 
-server.on("error", (err) => {
-  console.error(`サーバーを起動できません: ${err.message}`);
+server.on("error", (err: NodeJS.ErrnoException) => {
+  const reason =
+    err.code === "EADDRINUSE" ? `ポート${config.port}は使用中です。Nijimakuを二重に起動していないか確かめてください` : err.message;
+  console.error(`サーバーを起動できません: ${reason}`);
   process.exit(1);
 });
 
@@ -422,6 +425,11 @@ server.listen(config.port, HOST, () => {
   console.log(`luna: mode=${config.lunaMode} service_tier=${config.lunaServiceTier}`);
   logger.log("luna.config", { mode: config.lunaMode, service_tier: config.lunaServiceTier });
   realtime.start();
+  // listenの後に開く。start.cmdで先に開くと、ページの読み込みがサーバーの起動に間に合わないことがある
+  if (process.argv.includes("--open")) {
+    console.log("このウィンドウを閉じるとNijimakuが止まります");
+    openBrowser(`http://localhost:${config.port}/`);
+  }
 });
 
 let shuttingDown = false;
