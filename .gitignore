@@ -8,3 +8,4 @@ samples/
 settings.json*
 credentials.json*
 .plan/
+settings.bkup.json
