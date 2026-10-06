@@ -10,8 +10,14 @@
   <body>
     <div id="overlay"></div>
     <script type="module">
-      import { mountOverlay } from "./overlay.js";
-      mountOverlay(document.getElementById("overlay"));
+      import { createVersionWatch, mountOverlay } from "./overlay.js";
+      // 更新でサーバーの版が変わったら、新しい版のoverlay.js・overlay.cssを読み直す
+      const isNewVersion = createVersionWatch();
+      mountOverlay(document.getElementById("overlay"), {
+        onVersion: (version) => {
+          if (isNewVersion(version)) location.reload();
+        },
+      });
     </script>
   </body>
 </html>

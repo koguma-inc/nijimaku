@@ -34,6 +34,14 @@ const rtDetailEl = $("cap-rt-detail");
 const liveEl = $("cap-live");
 const setupEl = $("cap-setup");
 const messageEl = $("cap-message");
+const versionEl = $("cap-version");
+const updateEl = $("cap-update");
+const updateTitle = $("cap-update-title");
+const updateNote = $("cap-update-note");
+const updateMessage = $("cap-update-message");
+const updateApply = /** @type {HTMLButtonElement} */ ($("cap-update-apply"));
+const updateLink = /** @type {HTMLAnchorElement} */ ($("cap-update-link"));
+const updateFailed = $("cap-update-failed");
 
 /** @type {{stream: MediaStream, ctx: AudioContext, source: MediaStreamAudioSourceNode, node: AudioWorkletNode} | null} */
 let audio = null;
@@ -396,6 +404,54 @@ copyUrlBtn.addEventListener("click", async () => {
   }, 2000);
 });
 
+// --- 版と更新 ---
+
+/** @type {{version: string, updater: boolean, canApply: boolean} | null} */
+let appInfo = null;
+/** @type {{state: string, version: string | null, url: string | null, message: string, failed: string | null} | null} */
+let updateStatus = null;
+// 更新を拒否されたときの理由（update.error）。状態が変わったら消す
+let updateError = "";
+
+const AFTER_RESTART = "再起動の後、このページは自動で読み直します。マイクの「開始」を押し直し、PiPは開き直してください。";
+
+function renderUpdate() {
+  const s = updateStatus;
+  const current = appInfo ? `v${appInfo.version}` : "";
+  // 確認に失敗しても字幕は使えるので、版の横に添えるだけにする
+  versionEl.textContent = s?.state === "error" && !s.version && current ? `${current}（${s.message}）` : current;
+
+  updateFailed.hidden = !s?.failed;
+  updateFailed.textContent = s?.failed ? `v${s.failed} の起動に失敗したため、${current} に戻しました。` : "";
+
+  // 新しい版が分かっているときだけ出す
+  const shown = !!s?.version && ["available", "downloading", "restarting", "error"].includes(s.state);
+  updateEl.hidden = !shown;
+  if (!s || !shown) return;
+  const busy = s.state === "downloading" || s.state === "restarting";
+  updateTitle.textContent =
+    s.state === "downloading" ? `v${s.version} をダウンロードしています…` :
+    s.state === "restarting" ? "再起動しています…" :
+    `新しい版 v${s.version} があります（今は ${current}）`;
+  updateNote.textContent = busy ? AFTER_RESTART : appInfo?.canApply
+    ? `更新すると、再起動の間（数秒）字幕が止まります。${AFTER_RESTART}`
+    : "更新は、Nijimakuを動かしているPCで開いたページから実行できます。";
+  updateMessage.textContent = updateError || (s.state === "error" ? s.message : "");
+  updateMessage.classList.toggle("is-error", updateMessage.textContent !== "");
+  updateApply.hidden = !appInfo?.canApply;
+  updateApply.disabled = busy;
+  updateApply.setAttribute("aria-busy", String(busy));
+  updateLink.hidden = !s.url;
+  if (s.url) updateLink.href = s.url;
+  updateLink.textContent = s.state === "error" ? "Releaseのページ" : "変更点";
+}
+
+updateApply.addEventListener("click", () => {
+  updateError = "";
+  if (!settings.applyUpdate()) updateError = "サーバーとの接続が切れています。再接続を待ってからもう一度押してください。";
+  renderUpdate();
+});
+
 // --- 設定のタブ ---
 
 const tabs = /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".cap-tab")]);
@@ -450,7 +506,7 @@ new ResizeObserver(() => {
 
 const updatePreview = mountPreview($("cap-preview"));
 
-mountSettings({
+const settings = mountSettings({
   card: $("cap-settings"),
   message: $("cap-settings-message"),
   onCredentials: (status) => {
@@ -469,6 +525,19 @@ mountSettings({
       },
     });
     updatePreview(values, styleVars);
+  },
+  onApp: (info) => {
+    appInfo = info;
+    renderUpdate();
+  },
+  onUpdate: (status) => {
+    updateStatus = status;
+    updateError = "";
+    renderUpdate();
+  },
+  onUpdateError: (text) => {
+    updateError = text;
+    renderUpdate();
   },
 });
 

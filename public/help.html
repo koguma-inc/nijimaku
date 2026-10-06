@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nijimaku 使い方</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --help-bg: #111113;
+        --help-surface: #18181b;
+        --help-border: #36363d;
+        --help-text: #ededef;
+        --help-muted: #a1a1aa;
+        --help-accent: #4c8ff8;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html {
+        background: var(--help-bg);
+        scroll-padding-top: 16px;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+        font-size: 15px;
+        line-height: 1.8;
+        color: var(--help-text);
+        background: var(--help-bg);
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 24px 80px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        line-height: 1.4;
+      }
+      h2 {
+        margin: 48px 0 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--help-border);
+        font-size: 18px;
+        line-height: 1.4;
+      }
+      h3 {
+        margin: 28px 0 8px;
+        font-size: 15.5px;
+        line-height: 1.5;
+      }
+      p,
+      ol,
+      ul {
+        margin: 0 0 12px;
+      }
+      ol,
+      ul {
+        padding-left: 1.5em;
+      }
+      li + li {
+        margin-top: 4px;
+      }
+      a {
+        color: var(--help-accent);
+      }
+      a:focus-visible {
+        outline: 2px solid var(--help-accent);
+        outline-offset: 2px;
+      }
+      code {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--help-surface);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.9em;
+      }
+      .help-lead {
+        margin: 8px 0 0;
+        color: var(--help-muted);
+      }
+      .help-box {
+        margin: 20px 0 0;
+        padding: 14px 18px;
+        border: 1px solid var(--help-border);
+        border-radius: 12px;
+        background: var(--help-surface);
+      }
+      .help-box h2 {
+        margin: 0 0 6px;
+        padding: 0;
+        border: 0;
+        font-size: 14px;
+        color: var(--help-muted);
+      }
+      .help-box ol {
+        margin: 0;
+      }
+      .help-note {
+        color: var(--help-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Nijimaku 使い方</h1>
+      <p class="help-lead">このページは閉じてよい。Nijimakuの画面（capture.html）のタブは、配信中ずっと開いておく。<a href="./">Nijimakuの画面へ</a></p>
+
+      <nav class="help-box" aria-labelledby="toc">
+        <h2 id="toc">目次</h2>
+        <ol>
+          <li><a href="#mic">マイクの音声を送る</a></li>
+          <li><a href="#obs">OBSに字幕を出す</a></li>
+          <li><a href="#pip">PiPで字幕を見る</a></li>
+          <li><a href="#update">新しい版に更新する</a></li>
+          <li><a href="#trouble">うまくいかないとき</a></li>
+        </ol>
+      </nav>
+
+      <section>
+        <h2 id="mic">マイクの音声を送る</h2>
+        <p>Nijimakuの画面（capture.html）で操作する。</p>
+        <ol>
+          <li>「マイク」で使うマイクを選び、「開始」を押す（初回はマイクの許可を求められる）。</li>
+          <li>メーターに音量が出て、「文字起こし」が「準備完了」になれば（右上の表示が「LIVE」になる）、話すと字幕が出る。メーターの白い線は「発話とみなす音量」で、音量が線を越えると右の数値が緑になる。</li>
+        </ol>
+        <p>このタブは配信中ずっと開いておく。タブを閉じるか「停止」を押すと、音声の送信が止まり、字幕が出なくなる。</p>
+      </section>
+
+      <section>
+        <h2 id="obs">OBSに字幕を出す</h2>
+        <ol>
+          <li>先にNijimakuを起動しておく（OBSの字幕のページもNijimakuから読み込む）。</li>
+          <li>OBSのソースの「＋」から「ブラウザ」を追加し、URLにNijimakuの画面の「OBS用URL」を入れる（「コピー」でコピーできる）。「幅」と「高さ」は既定の800×600から配信のキャンバスの大きさ（例: 1920と1080）に変える。字幕は画面の下寄りに出る。</li>
+          <li>「カスタムCSS」は既定のままにする（既定のCSSで背景が透過する）。</li>
+        </ol>
+        <ul>
+          <li>OBSでページを再読み込み（プロパティの「現在のページのキャッシュを更新」）しても、表示中の字幕がそのまま出る。</li>
+          <li>Nijimakuを再起動しても、OBSの字幕は自動で再接続する（OBS側の操作は要らない）。再起動すると表示中の字幕は消える。</li>
+          <li>文字の大きさ・色・位置は、Nijimakuの画面の「設定」の「表示」で変えられ、OBSにすぐ反映される。PiPでは、文字の大きさ・縁取りの太さ・間隔がOBSの2/3になり、「下からの位置」は反映されない（下端に寄せて出る）。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="pip">PiPで字幕を見る</h2>
+        <p>「手元モニター」の「PiPで開く」を押すと、字幕だけの小さなウィンドウが開き、常に他のウィンドウの手前に表示される（Chromeのみ）。配信画面とは別に、手元で字幕を確かめたいときに使う。</p>
+        <ul>
+          <li>ウィンドウは透過せず、位置はドラッグで動かす。</li>
+          <li>Nijimakuの画面のタブを閉じるか読み直すと、PiPも閉じる。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="update">新しい版に更新する</h2>
+        <p>Nijimakuは起動するたびに1回、GitHubのReleasesで新しい版を確かめる（Windowsの配布版だけ）。確かめられなかったときは「新しい版を確認できませんでした」と出るが、字幕はそのまま使える。</p>
+        <p>新しい版があると、ヘッダーの下に「新しい版 v0.3.0 があります（今は v0.2.0）」のように出る。「変更点」を押すと、その版のGitHubのReleaseのページが開く。今の版はヘッダーに出る。</p>
+
+        <h3>更新の手順</h3>
+        <ol>
+          <li>「更新して再起動」を押す。再起動の間（数秒）字幕が止まるので、配信中に押すときは注意する。</li>
+          <li>「ダウンロードしています…」→「再起動しています…」と出る。新しい版をダウンロードしてSHA256で照合し、自動で再起動する。ファイルのコピーなどの手作業は要らない。必要ならNode.jsも新しくする。</li>
+          <li>再起動の後、Nijimakuの画面は自動で読み直す。マイクの「開始」を押し直す。</li>
+          <li>PiPを使っていたら、「PiPで開く」で開き直す（Nijimakuの画面を読み直すとPiPのウィンドウは閉じる。ChromeのDocument Picture-in-Pictureの仕様）。</li>
+        </ol>
+        <ul>
+          <li>OBSのブラウザソース（字幕のページ）は、自動で新しい版を読み直す。OBS側の操作は要らない。</li>
+          <li>APIキー・設定・ログは、更新しても残る。</li>
+        </ul>
+
+        <h3>更新がうまくいかないとき</h3>
+        <ul>
+          <li>「更新できませんでした: &lt;理由&gt;」と出たとき: 今の版はそのまま使える。「更新して再起動」をもう一度押すと、やり直せる。</li>
+          <li>「v0.3.0 の起動に失敗したため、v0.2.0 に戻しました」のように出たとき: 新しい版が起動に失敗したので、自動で前の版に戻して起動し直している。前の版のまま使える。</li>
+          <li>「…には新しい起動役が要ります。Releaseのページから全部入りZIPをダウンロードし、今のフォルダに上書き展開してください」と出たとき: <a href="https://github.com/koguma-inc/nijimaku#windowsの配布版zip">READMEの「Windowsの配布版（ZIP）」</a>の「更新」の手順に従う。</li>
+        </ul>
+        <p>前の版に戻すボタンは無い。戻したいときは、READMEの同じ手順で前の版の全部入りZIPを上書き展開する。</p>
+      </section>
+
+      <section>
+        <h2 id="trouble">うまくいかないとき</h2>
+        <p class="help-note">起動する前の問題（Nijimakuの画面が開かない等）は、<a href="https://github.com/koguma-inc/nijimaku#windowsの配布版zip">READMEの「Windowsの配布版（ZIP）」</a>の「うまくいかないとき」を見る。</p>
+
+        <h3>「開始」を押せない</h3>
+        <p>APIキーが未設定。「はじめにOpenAIのAPIキーを設定してください。」の横の「APIキーを設定」を押すか、「設定」の「APIキー」で「OpenAI APIキー」に入力して「保存」を押す。</p>
+
+        <h3>字幕が出ない</h3>
+        <ul>
+          <li>「サーバー」が「接続済み」、「文字起こし」が「準備完了」になっているか確かめる。「接続できません」のときは、その下に理由が出る。</li>
+          <li>話しても音量がメーターの白い線（発話とみなす音量）を越えないと、字幕は出ない。「マイク」で選んだマイクが合っているか確かめる。白い線は「設定」の「入力」の「発話とみなす音量」で変えられる。</li>
+          <li>「マイクが切断されました。」と出たら、マイクをつなぎ直して「開始」を押す。</li>
+        </ul>
+
+        <h3>「別のタブやPCのページで開始されたため、このページからの送信を止めました。」と出た</h3>
+        <p>別のタブや別のPCのNijimakuの画面で「開始」を押すと、音声の入力がそちらに切り替わり、元のタブは止まる（「サーバー」が「切断（別のページで開始）」になる）。自動では戻らないので、戻すときは元のタブでもう一度「開始」を押す。</p>
+
+        <h3>マイクの加工の切り替えが反映されない</h3>
+        <p>「ノイズ抑制・自動ゲイン調整・エコー除去の切り替えは、停止→開始で反映されます。」と出たら、「停止」を押してから「開始」を押す。</p>
+
+        <h3>「PiPで開く」を押せない</h3>
+        <p>「このブラウザはDocument Picture-in-Pictureに対応していません。Chromeで開いてください。」と出ている。Nijimakuの画面をChromeで開く。</p>
+
+        <h3>更新に失敗した</h3>
+        <p><a href="#update">新しい版に更新する</a>の「更新がうまくいかないとき」を見る。</p>
+
+        <h3>黒いウィンドウを閉じた</h3>
+        <p>Windowsの配布版では、黒いウィンドウを閉じるとNijimakuが止まり、字幕が出なくなる。配信中は閉じない。止めてしまったら、<code>start.cmd</code>で起動し直す。</p>
+      </section>
+    </main>
+  </body>
+</html>
