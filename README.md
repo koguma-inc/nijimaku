@@ -1,4 +1,4 @@
-基準日: 2026-10-06・a043392の作業ツリー
+基準日: 2026-10-06・4bf9a99
 
 # nijimaku
 
@@ -10,7 +10,7 @@ OBS配信中の日本語音声をリアルタイムで文字起こしし、日�
 
 ## しくみ
 
-Chromeで開いたcapture.htmlが、マイクの音声をローカルのNodeサーバーへ送る。サーバーは無音判定で文を区切ってRealtime APIへ流し、確定した文をLunaで英訳し、overlay.html（OBS）とPiPへ配信する。字幕は「途中経過（薄い色）→確定した日本語→英訳」の順に更新される（`LUNA_MODE=combined`では、確定した日本語がLunaの修正後の文に置き換わってから英訳が付く）。設計判断は[docs/decisions.md](docs/decisions.md)にある。
+Chromeで開いたcapture.htmlが、マイクの音声をローカルのNodeサーバーへ送る。サーバーは無音判定で文を区切ってRealtime APIへ流し、確定した文をLunaで英訳し、overlay.html（OBS）とPiPへ配信する。字幕は「途中経過（薄い色）→確定した日本語→英訳」の順に更新される（`LUNA_MODE=combined`では、確定した日本語がLunaの修正後の文に置き換わってから英訳が付く）。
 
 ## 必要なもの
 
@@ -30,7 +30,7 @@ Chromeで開いたcapture.htmlが、マイクの音声をローカルのNodeサ�
 nr start
 ```
 
-Windowsでは`npm start`でもよい。起動すると、capture.htmlとoverlay.htmlのURL、ログファイルのパスが出る。既定のポートは4649。
+Windowsでは`npm start`でもよい。起動すると、capture.htmlとoverlay.htmlのURLと、ログの保存先が出る。既定のポートは4649。
 
 APIキーが未設定でもサーバーは起動する。画面からキーを保存すると、再起動せずに文字起こしと英訳へ反映される。localhostの設定画面では、キー未設定の間、マイクの「開始」は押せない。
 
@@ -44,7 +44,6 @@ APIキーが未設定でもサーバーは起動する。画面からキーを�
 
 - このタブは配信中ずっと開いておく。タブを閉じるか「停止」を押すと音声が止まる。
 - 別のタブや`scripts/replay.ts`で開始すると入力がそちらに切り替わり、元のタブには「別の入力に切り替わりました」と出る。自動では戻らないので、戻すときは元のタブでもう一度「開始」を押す。
-- タブを非表示にしたまま音声が途切れないかは実機確認待ち。途切れる場合の運用は確認後にここへ書く。
 
 ### OBSに字幕を出す
 
@@ -83,7 +82,7 @@ capture.htmlを http://localhost で開くと「設定」パネルが出て、�
 
 ### 環境変数
 
-`.env`か環境変数で変える。既定値は`src/config.ts`、主な値を決めた理由は[docs/decisions.md](docs/decisions.md)にある。`VAD_`で始まる値、`TRANSCRIBE_DELAY`、`DISPLAY_SEGMENTS`は、設定パネルの既定値になる。
+`.env`か環境変数で変える。既定値と、主な値を決めた理由は`src/config.ts`にある。`VAD_`で始まる値、`TRANSCRIBE_DELAY`、`DISPLAY_SEGMENTS`は、設定パネルの既定値になる。
 
 | 変数 | 内容 |
 | --- | --- |
@@ -100,24 +99,15 @@ capture.htmlを http://localhost で開くと「設定」パネルが出て、�
 | `LUNA_TIMEOUT_MS` | Lunaの応答を待つ上限。超えたら英訳は出さない。`combined`で修正後の日本語が未取得なら認識結果で確定する |
 | `CONTEXT_SIZE` | Lunaに文脈として渡す直前の文の数 |
 | `DISPLAY_SEGMENTS` | 字幕に出す文の数 |
-
-## 遅延の計測
-
-音声ファイルを流して、毎回同じ条件で遅延を測れる。
-
-1. `scripts/make-sample.sh`で`samples/`に日本語の音声サンプルを作る（macOSの`say`を使う）。
-2. サーバーを起動し、別のターミナルで`node scripts/replay.ts`を実行する。サンプルが実時間で`/ws/capture`へ流れ、ブラウザから送ったときと同じ経路を通る。
-3. `node scripts/latency.ts`で、最新のログから文ごとの遅延と中央値・p90を出す。
-
-これまでの計測結果は[`.plan/plan-mvp.md`](.plan/plan-mvp.md)の「計測の結果（PR3）」にある。
+| `SAVE_LOGS` | `1`にするとログを保存する。既定は`0`（保存しない） |
 
 ## ログ
 
-起動ごとに`logs/session-YYYYMMDD-HHmmss.jsonl`を作り、全イベントを1行ずつ書く。文字起こしの結果が平文で残るので、不要になったら手動で消す。APIキーは書かない。
+既定では保存しない。`SAVE_LOGS=1`にすると、起動ごとに`logs/session-YYYYMMDD-HHmmss.jsonl`を作り、全イベントを1行ずつ書く。文字起こしの結果が平文で残るので、不要になったら手動で消す。APIキーは書かない。
 
 ## セキュリティ上の前提
 
 - サーバーは`127.0.0.1`だけで待ち受ける。
 - captureとoverlayのWebSocketは、`Origin`が`http://localhost:PORT`か`http://127.0.0.1:PORT`、または`ALLOWED_ORIGINS`（`nr share`が設定する）のページからだけ受け付ける。`Origin`の無い接続（同じPCの`replay.ts`等）は受け付ける。同じPCの他のプロセスは信頼する前提。
-- 設定パネルのWebSocket（`/ws/settings`）は、`Origin`が`http://localhost:PORT`か`http://127.0.0.1:PORT`のページからだけ受け付け、`Origin`の無い接続も拒否する。`nr share`で公開したページからは設定を変えられない。
+- 設定パネルのWebSocket（`/ws/settings`）は、`Origin`が`http://localhost:PORT`か`http://127.0.0.1:PORT`のページからだけ受け付け、`Origin`の無い接続も拒否する。`nr share`で公開したページからは設定を変えられない。ただし判定は`Origin`だけなので、`nr share`中は、トンネル経由で`Origin`を偽装したブラウザ以外のクライアントが設定とAPIキーを変更・削除できる（保存済みのキーは読めない）。
 - APIキーの保存・削除も`/ws/settings`を使い、通常の設定の配信やログにはキーを含めない。

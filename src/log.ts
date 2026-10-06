@@ -3,7 +3,8 @@ import { createWriteStream, mkdirSync } from "node:fs";
 import path from "node:path";
 
 export type Logger = {
-  readonly path: string;
+  // 保存しないときはnull
+  readonly path: string | null;
   // t は既定でDate.now()。vad.speech_end等、発生時刻が記録時刻と違うときだけ渡す
   log(kind: string, fields?: Record<string, unknown>, t?: number): void;
   close(): Promise<void>;
@@ -28,6 +29,10 @@ export function createLogger(dir: string): Logger {
       return new Promise((resolve) => stream.end(resolve));
     },
   };
+}
+
+export function createNoopLogger(): Logger {
+  return { path: null, log() {}, close: async () => {} };
 }
 
 function stamp(d: Date): string {

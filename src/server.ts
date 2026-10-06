@@ -9,7 +9,7 @@ import { AudioPipeline, type InputStats } from "./audio-pipeline.ts";
 import { loadConfig, type Config } from "./config.ts";
 import { Corrector, type StreamContext } from "./corrector.ts";
 import { CredentialsStore } from "./credentials.ts";
-import { createLogger } from "./log.ts";
+import { createLogger, createNoopLogger } from "./log.ts";
 import { RealtimeSession, type TranscriptionConfig } from "./realtime.ts";
 import { SegmentStore, type Snapshot } from "./segments.ts";
 import { SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
@@ -34,7 +34,7 @@ try {
   process.exit(1);
 }
 
-const logger = createLogger(path.join(ROOT, "logs"));
+const logger = config.saveLogs ? createLogger(path.join(ROOT, "logs")) : createNoopLogger();
 const localOrigins = new Set([`http://localhost:${config.port}`, `http://127.0.0.1:${config.port}`]);
 const allowedOrigins = new Set([...localOrigins, ...config.allowedOrigins]);
 
@@ -419,7 +419,7 @@ server.listen(config.port, HOST, () => {
   console.log(`capture: http://localhost:${config.port}/`);
   console.log(`overlay: http://localhost:${config.port}/overlay.html`);
   for (const origin of config.allowedOrigins) console.log(`公開URL: ${origin}/`);
-  console.log(`log: ${logger.path}`);
+  console.log(`log: ${logger.path ?? "保存しない（SAVE_LOGS=1で保存する）"}`);
   console.log(`luna: mode=${config.lunaMode} service_tier=${config.lunaServiceTier}`);
   logger.log("luna.config", { mode: config.lunaMode, service_tier: config.lunaServiceTier });
   realtime.start();
