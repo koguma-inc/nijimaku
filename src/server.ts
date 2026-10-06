@@ -16,10 +16,14 @@ import { SegmentStore, type Snapshot } from "./segments.ts";
 import { SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
 import type { VadOptions } from "./vad.ts";
 
+// ROOTはアプリの版のフォルダ（開発時はリポジトリ）。利用者のデータは起動役が渡すDATA_DIRに置き、更新で版のフォルダが変わっても残す
 const ROOT = path.join(import.meta.dirname, "..");
+const DATA_DIR = process.env.NIJIMAKU_DATA_DIR || ROOT;
 const PUBLIC_DIR = path.join(ROOT, "public");
 const HOST = "127.0.0.1";
 const CLOSE_REPLACED = 4001;
+// 起動できないが版のせいではない。起動役（src/launcher.ts）はこのコードでは前の版へ戻さない
+const EXIT_NOT_VERSION_FAULT = 78;
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -32,17 +36,17 @@ try {
   config = loadConfig();
 } catch (err) {
   console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
+  process.exit(EXIT_NOT_VERSION_FAULT);
 }
 
-const logger = config.saveLogs ? createLogger(path.join(ROOT, "logs")) : createNoopLogger();
+const logger = config.saveLogs ? createLogger(path.join(DATA_DIR, "logs")) : createNoopLogger();
 const localOrigins = new Set([`http://localhost:${config.port}`, `http://127.0.0.1:${config.port}`]);
 const allowedOrigins = new Set([...localOrigins, ...config.allowedOrigins]);
 
-const settingsStore = new SettingsStore(settingsDefaults(config), path.join(ROOT, "settings.json"));
+const settingsStore = new SettingsStore(settingsDefaults(config), path.join(DATA_DIR, "settings.json"));
 for (const warning of settingsStore.load()) console.warn(`[settings] ${warning}`);
 const initial = settingsStore.current;
-const credentials = new CredentialsStore(path.join(ROOT, "credentials.json"), config.openaiApiKey);
+const credentials = new CredentialsStore(path.join(DATA_DIR, "credentials.json"), config.openaiApiKey);
 const credentialsWarning = credentials.load();
 if (credentialsWarning) console.warn(`[credentials] ${credentialsWarning}`);
 const staticRoutes = buildStaticRoutes();
@@ -411,10 +415,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 // --- 起動と終了 ---
 
 server.on("error", (err: NodeJS.ErrnoException) => {
-  const reason =
-    err.code === "EADDRINUSE" ? `ポート${config.port}は使用中です。Nijimakuを二重に起動していないか確かめてください` : err.message;
+  const inUse = err.code === "EADDRINUSE";
+  const reason = inUse ? `ポート${config.port}は使用中です。Nijimakuを二重に起動していないか確かめてください` : err.message;
   console.error(`サーバーを起動できません: ${reason}`);
-  process.exit(1);
+  process.exit(inUse ? EXIT_NOT_VERSION_FAULT : 1);
 });
 
 server.listen(config.port, HOST, () => {
@@ -430,6 +434,8 @@ server.listen(config.port, HOST, () => {
     console.log("このウィンドウを閉じるとNijimakuが止まります");
     openBrowser(`http://localhost:${config.port}/`);
   }
+  // 起動役は、readyの前に終わった版を起動の失敗とみなす
+  process.send?.({ type: "ready" });
 });
 
 let shuttingDown = false;

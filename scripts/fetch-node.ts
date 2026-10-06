@@ -4,11 +4,12 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-// 版を上げるときは、https://nodejs.org/dist/<版>/SHASUMS256.txt の win-x64/node.exe の値に合わせる
-const VERSION = "v24.21.0";
-const NODE_EXE_SHA256 = "ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32";
-
 const ROOT = path.join(import.meta.dirname, "..");
+
+// 版はruntime.jsonのwin32-x64に置く。上げるときはsha256を
+// https://nodejs.org/dist/<版>/SHASUMS256.txt の win-x64/node.exe の値に合わせる
+const runtime = JSON.parse(readFileSync(path.join(ROOT, "runtime.json"), "utf8")) as Record<string, { version: string; sha256: string }>;
+const { version: VERSION, sha256: NODE_EXE_SHA256 } = runtime["win32-x64"];
 
 // node.exeとLICENSEを置いたディレクトリを返す
 export async function fetchNode(): Promise<string> {

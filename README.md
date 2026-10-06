@@ -143,4 +143,4 @@ capture.htmlの「設定」パネルで、入力・文字起こし・表示の�
 
 ## ライセンス
 
-MIT（`LICENSE`）。Windowsの配布版に同梱するNode.jsと依存パッケージのライセンスは、それぞれ`node/LICENSE`と`node_modules/`の各パッケージにある。
+MIT（`LICENSE`）。Windowsの配布版に同梱するNode.jsと依存パッケージのライセンスは、それぞれ`node/LICENSE`と`app/versions/<版>/node_modules/`の各パッケージにある。

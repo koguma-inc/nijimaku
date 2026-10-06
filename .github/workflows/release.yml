@@ -1,0 +1,100 @@
+# タグ（v*）のpushで、WindowsでZIPを作って起動を確かめ、このリポジトリのReleaseとしてすぐ公開する。
+# workflow_dispatchではReleaseを作らず、ZIPをArtifactとして残す（ワークフローを試すため。試しのタグは打たない）。
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # windows-latestはWindows Server 2025へ移行中のため明示する
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # package.jsonにpackageManagerが無いので版の指定が要る。開発機と同じ版
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10.32.1
+      # runtime.jsonと同じ版
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: タグと版の一致を確かめる
+        if: github.ref_type == 'tag'
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -cnotmatch '^v\d+\.\d+\.\d+$' -or $env:GITHUB_REF_NAME -cne "v$version") {
+            Write-Error "タグ $env:GITHUB_REF_NAME が v$version と一致しないか、vX.Y.Zの形ではありません"
+            exit 1
+          }
+      # PATHのtarがbsdtarかは未確認のため、dist.tsと同じ絶対パスのtarの版を記録する
+      - run: '& "$env:SystemRoot\System32\tar.exe" --version'
+      - run: pnpm dist
+      - name: 起動の確認
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $dir = Join-Path $env:RUNNER_TEMP "nijimaku"
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          & "$env:SystemRoot\System32\tar.exe" -x -f "dist\nijimaku-$version-win-x64.zip" -C $dir
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $out = Join-Path $env:RUNNER_TEMP "launcher-out.txt"
+          $err = Join-Path $env:RUNNER_TEMP "launcher-err.txt"
+          $p = Start-Process -FilePath "$dir\node\node.exe" -ArgumentList "app\launcher.ts" -WorkingDirectory $dir -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          $ok = $false
+          $deadline = (Get-Date).AddSeconds(30)
+          while (-not $ok -and -not $p.HasExited -and (Get-Date) -lt $deadline) {
+            try {
+              $capture = Invoke-WebRequest -Uri "http://127.0.0.1:4649/" -TimeoutSec 2
+              $overlay = Invoke-WebRequest -Uri "http://127.0.0.1:4649/overlay.html" -TimeoutSec 2
+              $ok = $capture.StatusCode -eq 200 -and $overlay.StatusCode -eq 200
+            } catch {}
+            if (-not $ok) { Start-Sleep -Seconds 1 }
+          }
+          # 起動役とサーバー（子）をまとめて止める
+          taskkill /T /F /PID $p.Id | Out-Null
+          Get-Content $out, $err -ErrorAction SilentlyContinue
+          if (-not $ok) {
+            Write-Error "展開したZIPから起動できませんでした"
+            exit 1
+          }
+          exit 0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+  # 書き込みの権限は、依存パッケージのコードを実行しないこのジョブだけに与える
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: windows-2025
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist
+      # 起動前の手順はREADMEにだけ書き、本文はリンクにする。アンカーはREADMEの見出し「Windowsの配布版（ZIP）」に合わせる
+      - name: Releaseを公開する
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          printf '使い方: [READMEの「Windowsの配布版（ZIP）」](%s/%s/blob/%s/README.md#windowsの配布版zip)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$TAG" > notes.md
+          gh release create "$TAG" dist/*.zip dist/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes-file notes.md --generate-notes
