@@ -1,0 +1,123 @@
+基準日: 2026-10-06・a043392の作業ツリー
+
+# nijimaku
+
+OBS配信中の日本語音声をリアルタイムで文字起こしし、日本語と英訳を字幕として表示するツール。
+
+- 文字起こし: OpenAI Realtime API（`gpt-live-transcribe`）
+- 英訳: `gpt-6-luna`（Fast mode）。設定で、誤認識の修正と英訳を1回で行う方式にも切り替えられる
+- 表示先: OBSのブラウザソースと、ChromeのDocument Picture-in-Picture（PiP）ウィンドウ
+
+## しくみ
+
+Chromeで開いたcapture.htmlが、マイクの音声をローカルのNodeサーバーへ送る。サーバーは無音判定で文を区切ってRealtime APIへ流し、確定した文をLunaで英訳し、overlay.html（OBS）とPiPへ配信する。字幕は「途中経過（薄い色）→確定した日本語→英訳」の順に更新される（`LUNA_MODE=combined`では、確定した日本語がLunaの修正後の文に置き換わってから英訳が付く）。設計判断は[docs/decisions.md](docs/decisions.md)にある。
+
+## 必要なもの
+
+- Node.js 24.12以上（Mac・Windows）
+- Chrome（capture.htmlとPiP）
+- OBS Studio（ブラウザソース）
+- OpenAIのAPIキー（`gpt-live-transcribe`と`gpt-6-luna`を使えること）
+
+## セットアップ
+
+1. 依存を入れる。`ni`を使う（pnpmのロックファイルがある）。`ni`が無ければ`pnpm install`。
+2. 起動後、Chromeで設定画面を開き、「OpenAI APIキー」にキーを入力して「保存」を押す。`.env`の作成・編集は不要。
+
+## 起動
+
+```sh
+nr start
+```
+
+Windowsでは`npm start`でもよい。起動すると、capture.htmlとoverlay.htmlのURL、ログファイルのパスが出る。既定のポートは4649。
+
+APIキーが未設定でもサーバーは起動する。画面からキーを保存すると、再起動せずに文字起こしと英訳へ反映される。localhostの設定画面では、キー未設定の間、マイクの「開始」は押せない。
+
+## 使い方
+
+### マイクの音声を送る（capture.html）
+
+1. Chromeで http://localhost:4649/ を開く。
+2. 「マイク」で使うマイクを選び、「開始」を押す（初回はマイクの許可を求められる）。
+3. 「レベル」のメーターに音量が出て、「文字起こし」が「準備完了（ready）」になれば字幕が出る。
+
+- このタブは配信中ずっと開いておく。タブを閉じるか「停止」を押すと音声が止まる。
+- 別のタブや`scripts/replay.ts`で開始すると入力がそちらに切り替わり、元のタブには「別の入力に切り替わりました」と出る。自動では戻らないので、戻すときは元のタブでもう一度「開始」を押す。
+- タブを非表示にしたまま音声が途切れないかは実機確認待ち。途切れる場合の運用は確認後にここへ書く。
+
+### OBSに字幕を出す
+
+1. 先にサーバーを起動しておく（overlay.htmlもサーバーから配信される）。
+2. OBSのソースの「＋」から「ブラウザ」を追加し、URLに http://localhost:4649/overlay.html を入れる。「幅」と「高さ」は既定の800×600から配信のキャンバスの大きさ（例: 1920と1080）に変える。字幕は画面の下寄りに出る。
+3. 「カスタムCSS」は既定のままにする（既定のCSSで背景が透過する）。
+
+- overlayは接続するたびに、表示中の字幕をサーバーから受け取る。OBSでページを再読み込み（プロパティの「現在のページのキャッシュを更新」）しても字幕は戻る。
+- サーバーを再起動してもoverlayは自動で再接続する（OBS側の操作は要らない）。再起動すると表示中の字幕は消える。
+- 文字の大きさ・色・位置はcapture.htmlの設定パネル（「表示」）で変えられ、OBSにすぐ反映される。PiPでは、文字の大きさ・位置・縁取りの太さはPiP用の値のまま。パネルで変えていない値は`public/overlay.css`の`--nm-`で始まるCSS変数。
+
+### PiPで字幕を見る
+
+capture.htmlの「字幕をPiPで開く」を押すと、字幕だけの小さなウィンドウが他のウィンドウより手前に開く（Chromeのみ）。配信画面とは別に、手元で字幕を確かめたいときに使う。ウィンドウは透過せず、位置はドラッグで動かす。capture.htmlのタブを閉じるとPiPも閉じる。
+
+## 設定
+
+### OpenAI APIキー
+
+http://localhost:4649/ の設定パネルで入力・変更・削除できる。キーは`credentials.json`（gitには含めない）に平文で保存し、macOSでは所有者だけが読み書きできる権限にする。保存済みのキーはブラウザに返さず、画面には設定状態と接続状態だけを表示する。APIキーを変更すると、文字起こしの接続を張り替え、切り替え前の未確定音声は捨てる。
+
+既存の`.env`や環境変数の`OPENAI_API_KEY`も使える。画面で保存したキーが優先され、「保存したキーを削除」で環境変数のキーへ戻る。環境変数にもキーが無ければ未設定になる。ZIPにまとめて配布する場合は`credentials.json`・`.env`・利用者の`settings.json`・`logs/`を除外する。手動でアプリを入れ替える際も、利用者のキーと設定のファイルは保持する。
+
+### 設定パネル
+
+capture.htmlを http://localhost で開くと「設定」パネルが出て、入力・文字起こし・表示の設定を変えられる。変えた値はすぐ反映され、`settings.json`（gitには含めない）に保存される。値の優先順は「パネルで保存した値 > `.env` > 既定値」で、項目ごとの「既定」ボタンで`.env`か既定値に戻る。
+
+パネルにだけある項目:
+
+- 配信の説明: 文字起こしの`prompt`と、Lunaの英訳の前提に使う。
+- 用語集: 1語ごとに日本語と英語の欄に入れる（例: `紫薇令あもる`と`Shibirei Amoru`）。末尾の空欄に書くと追加される。日本語は文字起こしの`keywords`、組はLunaに渡して英語の表記を揃える。英語を空にした語は文字起こしにだけ使う。
+- 文字起こしの言語、マイクの加工（Chromeのノイズ抑制・自動ゲイン・エコー除去）、字幕の大きさ・色・位置・間隔。
+- 字幕のフォント: 既定はOSのフォント（Macはヒラギノ角ゴ、Windowsは游ゴシック）。Noto Sans JP・Noto Serif JPを選ぶと、MacとWindowsで同じ字形になる。NotoはGoogle Fontsから読み込むため、OBSのPCがインターネットにつながっている必要がある（つながらなければOSのフォントで出る）。`public/overlay.css`はフォントを選んでいなくてもGoogle FontsのCSSを読み込む。
+
+文字起こしの`delay`を変えると、通常はRealtime接続を張り替えて反映する（切り替わるのは次に文を区切ったとき。張り替えの途中に変えたときは接続中のまま送るが、効くかは確かめていない）。それ以外の文字起こしの設定は、接続中のまま反映する。マイクの加工の切り替えが開始中のマイクに反映されなければ、「停止」→「開始」で反映される。
+
+### 環境変数
+
+`.env`か環境変数で変える。既定値は`src/config.ts`、主な値を決めた理由は[docs/decisions.md](docs/decisions.md)にある。`VAD_`で始まる値、`TRANSCRIBE_DELAY`、`DISPLAY_SEGMENTS`は、設定パネルの既定値になる。
+
+| 変数 | 内容 |
+| --- | --- |
+| `OPENAI_API_KEY` | 画面でAPIキーを保存していない場合に使うキー |
+| `PORT` | 待ち受けるポート |
+| `VAD_THRESHOLD_DB` | 発話とみなす音量（dBFS）。capture.htmlのメーターと同じ尺度 |
+| `VAD_SILENCE_MS` | 発話の後、この長さの無音が続いたら文を区切る |
+| `VAD_MIN_SPEECH_MS` | これより短い音は発話とみなさない |
+| `VAD_MAX_SEGMENT_MS` | 発話開始からこの長さで強制的に区切る |
+| `TRANSCRIBE_DELAY` | 文字起こしの`delay`（`minimal`・`low`等） |
+| `SESSION_ROTATE_MIN` | Realtime接続を張り替える間隔（分）。接続の期限（60分）より短くする |
+| `LUNA_MODE` | `translate`（既定。認識結果をそのまま字幕にし、英訳だけLunaに頼む）か`combined`（Lunaが誤認識を直した日本語と英訳を1回で返す） |
+| `LUNA_SERVICE_TIER` | Lunaの`service_tier`。既定は`fast`（Fast mode。単価は標準の2倍）。標準にするなら`default` |
+| `LUNA_TIMEOUT_MS` | Lunaの応答を待つ上限。超えたら英訳は出さない。`combined`で修正後の日本語が未取得なら認識結果で確定する |
+| `CONTEXT_SIZE` | Lunaに文脈として渡す直前の文の数 |
+| `DISPLAY_SEGMENTS` | 字幕に出す文の数 |
+
+## 遅延の計測
+
+音声ファイルを流して、毎回同じ条件で遅延を測れる。
+
+1. `scripts/make-sample.sh`で`samples/`に日本語の音声サンプルを作る（macOSの`say`を使う）。
+2. サーバーを起動し、別のターミナルで`node scripts/replay.ts`を実行する。サンプルが実時間で`/ws/capture`へ流れ、ブラウザから送ったときと同じ経路を通る。
+3. `node scripts/latency.ts`で、最新のログから文ごとの遅延と中央値・p90を出す。
+
+これまでの計測結果は[`.plan/plan-mvp.md`](.plan/plan-mvp.md)の「計測の結果（PR3）」にある。
+
+## ログ
+
+起動ごとに`logs/session-YYYYMMDD-HHmmss.jsonl`を作り、全イベントを1行ずつ書く。文字起こしの結果が平文で残るので、不要になったら手動で消す。APIキーは書かない。
+
+## セキュリティ上の前提
+
+- サーバーは`127.0.0.1`だけで待ち受ける。
+- captureとoverlayのWebSocketは、`Origin`が`http://localhost:PORT`か`http://127.0.0.1:PORT`、または`ALLOWED_ORIGINS`（`nr share`が設定する）のページからだけ受け付ける。`Origin`の無い接続（同じPCの`replay.ts`等）は受け付ける。同じPCの他のプロセスは信頼する前提。
+- 設定パネルのWebSocket（`/ws/settings`）は、`Origin`が`http://localhost:PORT`か`http://127.0.0.1:PORT`のページからだけ受け付け、`Origin`の無い接続も拒否する。`nr share`で公開したページからは設定を変えられない。
+- APIキーの保存・削除も`/ws/settings`を使い、通常の設定の配信やログにはキーを含めない。

@@ -1,0 +1,99 @@
+/* 字幕の見た目。overlay.html（OBS）とPiPで共有する。
+   capture.htmlも読み込むため、nm-接頭辞のクラスと.is-pipにだけ当てる。 */
+
+/* 設定パネルで選べるNotoのフォント。字のファイルは、そのフォントで描いた文字の分だけ読み込まれる。
+   太さは--nm-font-weightに合わせる（変えたらwghtも変える） */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Noto+Serif+JP:wght@700&display=swap");
+
+:root {
+  --nm-font-system: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Meiryo", "Noto Sans JP", sans-serif;
+  --nm-font-family: var(--nm-font-system);
+  --nm-font-weight: 700;
+  --nm-ja-size: 36px;
+  --nm-en-size: 30px;
+  --nm-line-height: 1.35;
+  --nm-en-letter-spacing: 0.0125em;
+  --nm-ja-color: #ffffff;
+  --nm-en-color: #ffdbfe;
+  --nm-partial-opacity: 0.6;
+  --nm-stroke-color: #1a1a1a;
+  --nm-stroke-width: 3px;
+  --nm-shadow-blur: 6px;
+  --nm-segment-gap: 12px;
+  /* line-heightの上下の余白に足す。負の値で詰める */
+  --nm-en-gap: -4px;
+  --nm-bottom: 48px;
+  --nm-side: 48px;
+  --nm-max-width: 1200px;
+  --nm-pip-bg: #101014;
+}
+
+.nm-subs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--nm-bottom);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--nm-segment-gap);
+  padding: 0 var(--nm-side);
+  pointer-events: none;
+  font-family: var(--nm-font-family);
+  font-weight: var(--nm-font-weight);
+  line-height: var(--nm-line-height);
+  text-align: center;
+}
+
+.nm-seg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: var(--nm-max-width);
+}
+
+/* 縁取りは輪郭線を字の下に描く（paint-orderがHTMLの文字に効くのはChrome 123以降。OBS 32.xは127）。
+   輪郭線は内外に半分ずつ描かれ、内側は字に隠れるので、太さを2倍にする */
+.nm-line {
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  -webkit-text-stroke: calc(var(--nm-stroke-width) * 2) var(--nm-stroke-color);
+  paint-order: stroke fill;
+  text-shadow: 0 0 var(--nm-shadow-blur) var(--nm-stroke-color);
+}
+
+.nm-ja {
+  font-size: var(--nm-ja-size);
+  color: var(--nm-ja-color);
+}
+
+/* flexのgapは負の値を取れないため、間隔はmarginで付ける */
+.nm-en {
+  margin-top: var(--nm-en-gap);
+  font-size: var(--nm-en-size);
+  letter-spacing: var(--nm-en-letter-spacing);
+  color: var(--nm-en-color);
+}
+
+.nm-en[hidden] {
+  display: none;
+}
+
+/* 文字の色を透かすと字の下に描いた縁取りが透けるため、縁取りごと薄くする */
+.nm-seg[data-state="partial"] .nm-ja {
+  opacity: var(--nm-partial-opacity);
+}
+
+/* PiPウィンドウ。OBSと違い透過できないため不透明な背景を敷き、文字を小さくする */
+body.is-pip {
+  --nm-ja-size: 24px;
+  --nm-en-size: 17px;
+  --nm-stroke-width: 2px;
+  --nm-shadow-blur: 4px;
+  --nm-segment-gap: 8px;
+  --nm-bottom: 16px;
+  --nm-side: 16px;
+  margin: 0;
+  overflow: hidden;
+  background: var(--nm-pip-bg);
+}

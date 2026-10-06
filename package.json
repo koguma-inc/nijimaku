@@ -1,0 +1,23 @@
+{
+  "name": "nijimaku",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.12"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.ts",
+    "share": "node --env-file-if-exists=.env scripts/share.ts",
+    "typecheck": "tsc",
+    "test": "node --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "openai": "^7.27.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "@types/ws": "^8.18.2",
+    "typescript": "^7.0.2"
+  }
+}

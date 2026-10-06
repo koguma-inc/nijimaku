@@ -1,0 +1,3 @@
+trustPolicy: no-downgrade # 信頼レベルが以前のリリースより低下したらインストールを失敗させる
+trustPolicyIgnoreAfter: 525600 # 公開から1年経ったバージョンは信頼レベルの低下を無視
+minimumReleaseAge: 4320 # 公開から3日未満のバージョンはインストールしない
