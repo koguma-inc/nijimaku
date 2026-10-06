@@ -36,7 +36,8 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
   writeFileSync(path.join(dir, "credentials.json"), `{"openaiApiKey":"${secret}`);
   const port = await freePort();
   const origin = `http://localhost:${port}`;
-  const script = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")).scripts.start as string;
+  const { version, scripts } = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8"));
+  const script = scripts.start as string;
   const child = spawn(process.execPath, script.split(" ").slice(1), {
     cwd: dir,
     env: { ...process.env, OPENAI_API_KEY: "", PORT: String(port), ALLOWED_ORIGINS: "https://shared.example" },
@@ -60,6 +61,13 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
   const httpBase = `http://127.0.0.1:${port}`;
   assert.equal((await fetch(httpBase)).status, 200);
   assert.equal((await fetch(`${httpBase}/credentials.json`)).status, 404);
+
+  // overlay.htmlが版の変化で読み直せるよう、最初に版を送る
+  const overlay = new WebSocket(`ws://127.0.0.1:${port}/ws/overlay`);
+  sockets.push(overlay);
+  const [first] = await once(overlay, "message");
+  assert.deepEqual(JSON.parse(first.toString()), { type: "app", version });
+  overlay.close();
 
   for (const blockedOrigin of [undefined, "null", "https://untrusted.example"]) {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, {
@@ -94,6 +102,13 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
     assert.equal(status.configured, false);
     assert.equal(status.saved, false);
     assert.equal(status.state, "unconfigured");
+    // 起動役から起動していないので、更新機能は無効で版だけを知らせる
+    const info = await receive("app.info");
+    assert.deepEqual(info, { type: "app.info", version, nodeVersion: process.version, updater: false, canApply: false });
+    assert.equal((await receive("update.status")).state, "idle");
+    socket.send(JSON.stringify({ type: "update.apply" }));
+    if (allowedOrigin === "https://shared.example") assert.match(String((await receive("update.error")).message), /PCで開いたページ/);
+    else assert.equal((await receive("update.status")).state, "idle");
 
     socket.send(JSON.stringify({ type: "set", key: "displaySegments", value: 4 }));
     const changed = await receive("settings");
@@ -127,7 +142,8 @@ test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置
   const port = await freePort();
   const child = spawn(process.execPath, [path.join(appDir, "src", "server.ts")], {
     cwd: dataDir,
-    env: { ...process.env, OPENAI_API_KEY: "", PORT: String(port), SAVE_LOGS: "1", NIJIMAKU_DATA_DIR: dataDir },
+    // 更新の確認は、閉じたポートへ向けて失敗させる
+    env: { ...process.env, OPENAI_API_KEY: "", PORT: String(port), SAVE_LOGS: "1", NIJIMAKU_DATA_DIR: dataDir, NIJIMAKU_LAUNCHER: "1", NIJIMAKU_UPDATE_API: `http://127.0.0.1:${await freePort()}/releases/latest` },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let output = "";
@@ -151,7 +167,14 @@ test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置
 
   const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: `http://localhost:${port}` } });
   t.after(() => socket.terminate());
+  const messages: Record<string, unknown>[] = [];
+  socket.on("message", (raw) => messages.push(JSON.parse(raw.toString())));
   await once(socket, "open");
+  // 起動役から起動されたので更新機能が有効。確認に失敗しても動き続ける
+  while (!messages.some((m) => m.type === "update.status" && m.state === "error")) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(messages.find((m) => m.type === "app.info")?.updater, true);
+  assert.equal(messages.find((m) => m.type === "app.info")?.canApply, true);
+  assert.match(output, /\[update\] 新しい版を確認できませんでした/);
   socket.send(JSON.stringify({ type: "set", key: "displaySegments", value: 4 }));
   while (!existsSync(path.join(dataDir, "settings.json"))) await new Promise((resolve) => setTimeout(resolve, 20));
   assert.equal(JSON.parse(readFileSync(path.join(dataDir, "settings.json"), "utf8")).displaySegments, 4);

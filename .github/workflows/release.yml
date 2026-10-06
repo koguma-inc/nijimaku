@@ -69,6 +69,10 @@ jobs:
             exit 1
           }
           exit 0
+      # Windows固有の動作（実行中のファイル、tar.exe、Node.jsの切り替え）を確かめる
+      - name: 更新のE2E
+        timeout-minutes: 15
+        run: node scripts/e2e-update.ts
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist

@@ -1,5 +1,7 @@
 // capture.htmlの設定パネル。/ws/settingsから項目の定義と値を受け取って描画し、変更を送る。
-// メッセージの形はsrc/settings.tsの先頭にある。
+// メッセージの形はsrc/settings.tsの先頭にある。版と更新の状態（app.info・update.status）も同じ接続で受け取る。
+import { createVersionWatch } from "./overlay.js";
+
 const BACKOFF_MIN_MS = 1000;
 const BACKOFF_MAX_MS = 30000;
 
@@ -50,15 +52,18 @@ function setSlider(slider, value) {
 }
 
 /**
- * @param {{card: HTMLElement, message: HTMLElement, onValues: (values: Record<string, unknown>, styleVars: Record<string, string>) => void, onCredentials: (status: any) => void}} opts
+ * @param {{card: HTMLElement, message: HTMLElement, onValues: (values: Record<string, unknown>, styleVars: Record<string, string>) => void, onCredentials: (status: any) => void, onApp: (info: any) => void, onUpdate: (status: any) => void, onUpdateError: (message: string) => void}} opts
+ * @returns {{applyUpdate: () => boolean}}
  */
-export function mountSettings({ card, message, onValues, onCredentials }) {
+export function mountSettings({ card, message, onValues, onCredentials, onApp, onUpdate, onUpdateError }) {
   /** @type {Map<string, {field: any, input?: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, widget?: {el: HTMLElement, render: (value: any[]) => void}, reset: HTMLButtonElement, picker?: HTMLInputElement, slider?: HTMLInputElement}>} */
   const rows = new Map();
   /** @type {WebSocket | null} */
   let ws = null;
   let backoff = BACKOFF_MIN_MS;
   let built = false;
+  // 更新の再起動の後、新しい版のpublic/を読むためにページを読み直す
+  const isNewVersion = createVersionWatch();
   const keyForm = card.querySelector("#cap-api-key-form");
   const keyInput = card.querySelector("#cap-api-key");
   const keySave = card.querySelector("#cap-api-key-save");
@@ -477,6 +482,11 @@ export function mountSettings({ card, message, onValues, onCredentials }) {
       if (msg?.type === "settings") render(msg);
       else if (msg?.type === "settings.error") setMessage(String(msg.message), true);
       else if (msg?.type === "credentials.status") renderCredentials(msg);
+      else if (msg?.type === "app.info") {
+        if (isNewVersion(msg.version)) location.reload();
+        else onApp(msg);
+      } else if (msg?.type === "update.status") onUpdate(msg);
+      else if (msg?.type === "update.error") onUpdateError(String(msg.message));
       else if (msg?.type === "credentials.saved") {
         keyInput.value = "";
         setKeyMessage(keyPending === "reset" ? "保存したキーを削除しました。" : "APIキーを保存しました。");
@@ -504,4 +514,5 @@ export function mountSettings({ card, message, onValues, onCredentials }) {
   }
 
   connect();
+  return { applyUpdate: () => send({ type: "update.apply" }) };
 }

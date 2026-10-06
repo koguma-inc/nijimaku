@@ -1,4 +1,4 @@
-基準日: 2026-10-06・1114a16
+基準日: 2026-10-06・74c05ff
 
 # 設計メモ
 
@@ -31,6 +31,19 @@ Windowsの配布版では、`start.cmd`が同梱のNode.jsで起動役（`src/la
   - それ以外: ready前なら起動の失敗、ready後なら異常終了。
 - ready前の起動の失敗で、`current.json`の`pending`がtrueで`previous`があれば、起動役は`previous`へ戻して起動し直す。戻すのは起動役の1回の実行につき1回まで。
 - `--open`は、起動役の実行で子が一度もreadyに達していない間だけ付ける（更新の再起動のたびにChromeのタブが増えないように）。
+
+## 更新機能
+
+`src/update.ts`。起動役から起動されたとき（`NIJIMAKU_LAUNCHER=1`）だけ有効にする。readyの後に初期化（`pending`の解除・`current.json`が指さない版とNode.jsの削除）を終えてから`releases/latest`を1回だけ確かめ、利用者が「更新して再起動」を押したときだけ適用する。
+
+- 照合はReleaseに添付した`SHA256SUMS.txt`で行う。assetの`digest`は`null`になり得るため使わない。Node.jsは、アプリ部分の`runtime.json`（`fetch-node.ts`と同じ値）の`sha256`で照合し、nodejs.orgの`SHASUMS256.txt`は更新時に取りに行かない。
+- 署名はしない。鍵をActionsのsecretに置くなら、GitHubのアカウントを乗っ取られたときに守れない点はSHA256と変わらない。
+- 自動では適用しない（再起動で配信中の字幕が止まるため）。定期的にも確かめない（配信のたびに起動する。未認証のAPIは60回/時まで）。
+- `current.json`は、照合・展開・検証を終えてから書き換える。途中で失敗したら`app/tmp/`を消し、`current.json`は変えない。
+- 初期化と適用は重ならない。適用は確認で新しい版が分かった後だけ受け付けるため。
+- `update.apply`は`http://localhost:PORT`・`http://127.0.0.1:PORT`のページからだけ受け付け、`ALLOWED_ORIGINS`（`nr share`）からは拒否する。通知は全員に送る。
+- 更新でサーバーの版が変わったら、capture.html（`/ws/settings`の`app.info`）とoverlay.html（`/ws/overlay`の`app`）はページを読み直す。どちらも、読み込んでから最初に受けた版を基準にする（同じ版への再接続や、起動の失敗での戻しでは読み直さない）。
+- `update.ts`は`launch-state.ts`から型だけを使う。`launch-state.ts`は起動役と一緒に`app/`にだけ置かれ、版のフォルダには入らないため。
 
 ## 既知の問題
 

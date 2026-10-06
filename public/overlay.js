@@ -72,11 +72,29 @@ export function createSubs(container) {
 }
 
 /**
+ * ページを読み込んでから最初に受けた版を基準にし、違う版を受けたらtrueを返す関数を作る
+ * @returns {(version: unknown) => boolean}
+ */
+export function createVersionWatch() {
+  /** @type {string | null} */
+  let base = null;
+  return (version) => {
+    if (typeof version !== "string") return false;
+    if (base === null) {
+      base = version;
+      return false;
+    }
+    return version !== base;
+  };
+}
+
+/**
  * /ws/overlayのスナップショットを描画する。overlay.htmlとPiPの両方で使う。
  * @param {HTMLElement} container
+ * @param {{onVersion?: (version: string) => void}} [options] onVersionは接続ごとにサーバーの版を受ける
  * @returns {() => void} アンマウント関数
  */
-export function mountOverlay(container) {
+export function mountOverlay(container, { onVersion } = {}) {
   // WebSocketとlocationはこのモジュールのwindowのもの（PiPのlocationはサーバーを指さない）
   const doc = container.ownerDocument;
   const { render, remove } = createSubs(container);
@@ -121,6 +139,7 @@ export function mountOverlay(container) {
       }
       if (msg?.type === "snapshot" && Array.isArray(msg.segments)) render(msg.segments);
       else if (msg?.type === "style" && msg.vars && typeof msg.vars === "object") applyStyle(msg.vars);
+      else if (msg?.type === "app" && typeof msg.version === "string") onVersion?.(msg.version);
     };
     socket.onclose = () => {
       if (ws !== socket) return;

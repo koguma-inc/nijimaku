@@ -1,4 +1,4 @@
-基準日: 2026-10-06・c145459
+基準日: 2026-10-06・74c05ff
 
 # 残作業
 
@@ -6,21 +6,22 @@
 
 ## 配布
 
-開発者とは別の利用者へZIPで配り、ダブルクリックで起動できるようにする。まずWindows（x64）だけを配り、OSごとにZIPを分ける。Windows用のZIPは`nr dist`で作れる（`scripts/dist.ts`）。ZIPはこのリポジトリのReleasesに置く。
+開発者とは別の利用者へZIPで配り、ダブルクリックで起動できるようにする。まずWindows（x64）だけを配り、OSごとにZIPを分ける。ZIPはこのリポジトリのReleasesに置く。Windows用のZIPは`nr dist`で作れる（`scripts/dist.ts`）。タグ（`v*`）をpushすると、GitHub ActionsがZIPを作ってReleasesに公開する。
 
-1. リリースの自動化: タグ（`v*`）のpushで、GitHub ActionsのWindowsの実行環境がZIPを作り、展開して起動を確かめてからReleasesに置く。初回用の全部入りZIP、更新用のアプリ部分だけのZIP、SHA256のチェックサムを添付する。
-2. 更新機能: 起動時に新しい版を通知し、利用者の操作で更新する。更新ではアプリ部分だけを差し替え、Node.jsは入れ替えない（Node.js自体を上げる方法は実装時に決める）。更新してもAPIキーと設定は残し、失敗したら旧版を使えるようにする。
-3. Mac: `start.command`を作る。Gatekeeperで止められないかは要確認。
+1. 最初のReleaseの公開: 更新機能のPRのマージ後に、`package.json`の`version`を0.2.0にしてタグ`v0.2.0`をpushする。最初に公開する版に更新機能が入っていないと、その版を入れた人は自動では更新できないため。その前に`workflow_dispatch`でワークフロー（Windowsでのテスト・ZIPの作成・起動の確認・更新のE2E）が通ることを確かめる。
+2. Mac: `start.command`を作る。Gatekeeperで止められないかは要確認。`runtime.json`はOSごとの項目なので、Macを足すときは項目と、Node.jsの取得・展開の方法（nodejs.orgのMac版は`.tar.gz`）も足す。
 
 ## その後
 
-- Whisperによるローカル文字起こし（issue #2）。リリースと更新機能の後に着手する。
+- Whisperによるローカル文字起こし（issue #2）。最初のReleaseの公開の後に着手する。
 
 ## 確認待ち
 
 配信者にWindows用のZIPを渡して確かめる。
 
-- `start.cmd`で起動し、Chromeでcapture.htmlが開くか。展開・起動時の警告と、READMEの操作手順が合っているか。
+- `start.cmd`で起動し、Chromeでcapture.htmlが開くか。展開・起動時の警告と、READMEと画面の「使い方」の操作手順が合っているか。
 - 実APIでの動作。
 - VADの値（`VAD_THRESHOLD_DB`・`VAD_SILENCE_MS`）をマイクで決め直す。
 - captureのタブを非表示にしたまま音声が途切れないか。途切れる場合の運用をREADMEに書く。
+- v0.2.0の公開後、次の版で、配信者のWindowsで次を確かめる: Releaseから落とした全部入りZIPの起動、更新の通知、「更新して再起動」、再起動後の動作（capture.htmlの読み直し、OBSのoverlayの読み直し）。
+- 更新で取得した`node.exe`にSmartScreenの警告が出ないか（未確認）。

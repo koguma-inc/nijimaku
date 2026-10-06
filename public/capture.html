@@ -97,6 +97,27 @@
         font-size: 13px;
         color: var(--cap-muted);
       }
+      body.cap-page .cap-header-side {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px 16px;
+      }
+      body.cap-page .cap-version {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: var(--cap-faint);
+      }
+      body.cap-page .cap-help {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--cap-muted);
+        text-underline-offset: 3px;
+      }
+      body.cap-page .cap-help:hover {
+        color: var(--cap-text);
+      }
       body.cap-page .cap-live {
         display: inline-flex;
         align-items: center;
@@ -130,6 +151,42 @@
       body.cap-page[data-live="on"] .cap-live::before {
         background: #fff;
         animation: cap-blink 1.2s steps(1) infinite;
+      }
+
+      /* --- 更新の通知 --- */
+      body.cap-page .cap-update {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px 20px;
+        padding: 14px 16px 14px 18px;
+        border: 1px solid rgba(76, 143, 248, 0.45);
+        border-radius: 12px;
+        background: var(--cap-accent-soft);
+      }
+      body.cap-page .cap-update-main {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+      body.cap-page .cap-update-title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+      body.cap-page .cap-update-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      body.cap-page .cap-update-failed {
+        padding: 10px 14px;
+        border: 1px solid rgba(245, 181, 68, 0.35);
+        border-radius: 8px;
+        background: rgba(245, 181, 68, 0.06);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--cap-warn);
       }
 
       body.cap-page .cap-card {
@@ -1006,8 +1063,25 @@
           <h1>Nijimaku</h1>
           <p class="cap-tagline">配信の声を、日本語と英語の字幕に</p>
         </div>
-        <span class="cap-live" id="cap-live" role="status">停止中</span>
+        <div class="cap-header-side">
+          <span class="cap-version" id="cap-version"></span>
+          <a class="cap-help" href="./help.html" target="_blank" rel="noopener">使い方</a>
+          <span class="cap-live" id="cap-live" role="status">停止中</span>
+        </div>
       </header>
+
+      <section class="cap-update" id="cap-update" aria-label="更新" hidden>
+        <div class="cap-update-main">
+          <p class="cap-update-title" id="cap-update-title" role="status" aria-live="polite"></p>
+          <p class="cap-note" id="cap-update-note"></p>
+          <p class="cap-message" id="cap-update-message" role="alert"></p>
+        </div>
+        <div class="cap-update-actions">
+          <button type="button" class="cap-btn cap-btn-primary" id="cap-update-apply">更新して再起動</button>
+          <a class="cap-btn" id="cap-update-link" href="#" target="_blank" rel="noopener">変更点</a>
+        </div>
+      </section>
+      <p class="cap-update-failed" id="cap-update-failed" role="status" hidden></p>
 
       <section class="cap-console" id="cap-console" aria-label="音声の入力">
         <div class="cap-console-main">

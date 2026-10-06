@@ -1,6 +1,6 @@
 // HTTP静的配信とWSアップグレード、各部品の配線。
 // 実行: nr start
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import path from "node:path";
@@ -14,16 +14,22 @@ import { openBrowser } from "./open-browser.ts";
 import { RealtimeSession, type TranscriptionConfig } from "./realtime.ts";
 import { SegmentStore, type Snapshot } from "./segments.ts";
 import { SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
+import { Updater, type UpdateStatus } from "./update.ts";
 import type { VadOptions } from "./vad.ts";
 
 // ROOTはアプリの版のフォルダ（開発時はリポジトリ）。利用者のデータは起動役が渡すDATA_DIRに置き、更新で版のフォルダが変わっても残す
 const ROOT = path.join(import.meta.dirname, "..");
 const DATA_DIR = process.env.NIJIMAKU_DATA_DIR || ROOT;
 const PUBLIC_DIR = path.join(ROOT, "public");
+const APP_VERSION = (JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as { version: string }).version;
 const HOST = "127.0.0.1";
 const CLOSE_REPLACED = 4001;
-// 起動できないが版のせいではない。起動役（src/launcher.ts）はこのコードでは前の版へ戻さない
+// 起動役（src/launcher.ts）への終了コード。75は更新を適用したので起動し直してほしい、
+// 78は起動できないが版のせいではない（起動役は前の版へ戻さない）
+const EXIT_RESTART = 75;
 const EXIT_NOT_VERSION_FAULT = 78;
+// 起動役のプロトコルの版。起動役から起動されたときだけ更新できる
+const LAUNCHER_PROTOCOL = 1;
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -207,6 +213,37 @@ function broadcastSettings(): void {
   broadcastJson(settingsClients, settingsStore.message());
 }
 
+// --- 更新 ---
+
+const updater =
+  process.env.NIJIMAKU_LAUNCHER === String(LAUNCHER_PROTOCOL)
+    ? new Updater({
+        installDir: DATA_DIR,
+        version: APP_VERSION,
+        launcher: LAUNCHER_PROTOCOL,
+        apiUrl: process.env.NIJIMAKU_UPDATE_API || undefined,
+        onStatus: (status) => {
+          logger.log("update.status", status);
+          broadcastJson(settingsClients, updateStatusMessage());
+        },
+        onRestart: () => shutdown(EXIT_RESTART),
+        warn: (message) => {
+          logger.log("update.warn", { message });
+          console.warn(`[update] ${message}`);
+        },
+      })
+    : null;
+const IDLE_STATUS: UpdateStatus = { state: "idle", version: null, url: null, message: "", failed: null };
+
+// canApplyは、その接続から更新を適用できるか
+function appInfoMessage(local: boolean): Record<string, unknown> {
+  return { type: "app.info", version: APP_VERSION, nodeVersion: process.version, updater: updater !== null, canApply: updater !== null && local };
+}
+
+function updateStatusMessage(): Record<string, unknown> {
+  return { type: "update.status", ...(updater?.status ?? IDLE_STATUS) };
+}
+
 function credentialsMessage(): Record<string, unknown> {
   return { type: "credentials.status", ...credentials.status, ...realtime.status };
 }
@@ -344,16 +381,22 @@ captureWss.on("connection", (ws: WebSocket) => {
 
 overlayWss.on("connection", (ws: WebSocket) => {
   overlays.add(ws);
+  // overlay.htmlは版が変わったら読み直す（更新後に古いoverlay.js・overlay.cssを使い続けない）
+  sendJson(ws, { type: "app", version: APP_VERSION });
   sendJson(ws, styleMessage());
   sendJson(ws, segments.snapshot());
   ws.on("close", () => overlays.delete(ws));
   ws.on("error", () => overlays.delete(ws));
 });
 
-settingsWss.on("connection", (ws: WebSocket) => {
+settingsWss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+  // 更新の適用はこのPCのページからだけ受け付け、nr shareの公開URLからは拒否する
+  const local = localOrigins.has(req.headers.origin ?? "");
   settingsClients.add(ws);
   sendJson(ws, settingsStore.message());
   sendJson(ws, credentialsMessage());
+  sendJson(ws, appInfoMessage(local));
+  sendJson(ws, updateStatusMessage());
   ws.on("message", (data, isBinary) => {
     if (isBinary) return;
     let message: unknown;
@@ -369,6 +412,12 @@ settingsWss.on("connection", (ws: WebSocket) => {
     }
     if (message.type === "credentials.reset") {
       changeCredentials(ws, () => credentials.reset());
+      return;
+    }
+    if (message.type === "update.apply") {
+      if (!local) sendJson(ws, { type: "update.error", message: "更新は、Nijimakuを動かしているPCで開いたページからだけ実行できます" });
+      // 受け付けなかったとき（確認中・適用中など）は今の状態を返す
+      else if (!updater?.apply()) sendJson(ws, updateStatusMessage());
       return;
     }
     if (typeof message.key !== "string") return;
@@ -436,20 +485,21 @@ server.listen(config.port, HOST, () => {
   }
   // 起動役は、readyの前に終わった版を起動の失敗とみなす
   process.send?.({ type: "ready" });
+  void updater?.start();
 });
 
 let shuttingDown = false;
 
-function shutdown(): void {
+function shutdown(code = 0): void {
   if (shuttingDown) return;
   shuttingDown = true;
   realtime.stop();
   current?.ws.close(1001);
   for (const ws of [...overlays, ...settingsClients]) ws.close(1001);
   server.close();
-  setTimeout(() => process.exit(0), 1000).unref();
-  void logger.close().then(() => process.exit(0));
+  setTimeout(() => process.exit(code), 1000).unref();
+  void logger.close().then(() => process.exit(code));
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => shutdown());
+process.on("SIGTERM", () => shutdown());
