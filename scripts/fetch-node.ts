@@ -1,7 +1,5 @@
 // 配布ZIPに同梱するWindows（x64）用のnode.exeとLICENSEを公式から取得し、dist/node-<版>-win-x64/に置く。
-// 取得済みでハッシュが一致すれば、node.exeは取り直さない。
-//
-// 実行: node scripts/fetch-node.ts
+// 取得済みでハッシュが一致すれば、node.exeは取り直さない。nr dist（scripts/dist.ts）から呼ぶ。
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -11,31 +9,28 @@ const VERSION = "v24.21.0";
 const NODE_EXE_SHA256 = "ba4e6d110e8c1592a1ecd390f6b05f3da124b13871a5be62b341a07a853c6c32";
 
 const ROOT = path.join(import.meta.dirname, "..");
-const OUT_DIR = path.join(ROOT, "dist", `node-${VERSION}-win-x64`);
-const exe = path.join(OUT_DIR, "node.exe");
-const license = path.join(OUT_DIR, "LICENSE");
 
-mkdirSync(OUT_DIR, { recursive: true });
+// node.exeとLICENSEを置いたディレクトリを返す
+export async function fetchNode(): Promise<string> {
+  const outDir = path.join(ROOT, "dist", `node-${VERSION}-win-x64`);
+  const exe = path.join(outDir, "node.exe");
+  const license = path.join(outDir, "LICENSE");
+  mkdirSync(outDir, { recursive: true });
 
-if (!existsSync(exe) || sha256(readFileSync(exe)) !== NODE_EXE_SHA256) {
-  const data = await get(`https://nodejs.org/dist/${VERSION}/win-x64/node.exe`);
-  const actual = sha256(data);
-  if (actual !== NODE_EXE_SHA256) {
-    console.error(`node.exeのハッシュが一致しません: ${actual}`);
-    process.exit(1);
+  if (!existsSync(exe) || sha256(readFileSync(exe)) !== NODE_EXE_SHA256) {
+    const data = await get(`https://nodejs.org/dist/${VERSION}/win-x64/node.exe`);
+    const actual = sha256(data);
+    if (actual !== NODE_EXE_SHA256) throw new Error(`node.exeのハッシュが一致しません: ${actual}`);
+    writeFileSync(exe, data);
   }
-  writeFileSync(exe, data);
+  // Node.jsを再配布するときはライセンス表記も同梱する
+  if (!existsSync(license)) writeFileSync(license, await get(`https://raw.githubusercontent.com/nodejs/node/${VERSION}/LICENSE`));
+  return outDir;
 }
-// Node.jsを再配布するときはライセンス表記も同梱する
-if (!existsSync(license)) writeFileSync(license, await get(`https://raw.githubusercontent.com/nodejs/node/${VERSION}/LICENSE`));
-console.log(OUT_DIR);
 
 async function get(url: string): Promise<Buffer> {
   const res = await fetch(url);
-  if (!res.ok) {
-    console.error(`取得できません: ${url} (HTTP ${res.status})`);
-    process.exit(1);
-  }
+  if (!res.ok) throw new Error(`取得できません: ${url} (HTTP ${res.status})`);
   return Buffer.from(await res.arrayBuffer());
 }
 
