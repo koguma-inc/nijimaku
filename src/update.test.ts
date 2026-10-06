@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, test, type TestContext } from "node:test";
+import { crc32 } from "node:zlib";
 import { makeZip } from "../scripts/dist.ts";
-import { bsdtarPath } from "./bsdtar.ts";
 import { parseCurrent } from "./launch-state.ts";
 import { compareVersions, findBadEntry, parseRelease, parseSums, Updater, type UpdaterOptions, type UpdateStatus } from "./update.ts";
 
@@ -137,6 +136,39 @@ function appZip(t: TestContext, options: AppZip = {}): { zip: Buffer; sha: strin
   makeZip(stage, file);
   const zip = readFileSync(file);
   return { zip, sha: sha256(zip) };
+}
+
+// 無圧縮のZIPを組み立てる。Windowsのtar.exeは-sに対応しておらず、tarでは不正な名前のエントリーを作れない
+function storedZip(entries: [name: string, data: string][]): Buffer {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [entry, text] of entries) {
+    const name = Buffer.from(entry);
+    const data = Buffer.from(text);
+    // ローカルヘッダーとセントラルディレクトリで共通の部分（必要な版から名前の長さまで）
+    const fields = Buffer.alloc(26);
+    fields.writeUInt16LE(20, 0);
+    fields.writeUInt16LE(0x21, 8); // 1980-01-01
+    fields.writeUInt32LE(crc32(data), 10);
+    fields.writeUInt32LE(data.length, 14);
+    fields.writeUInt32LE(data.length, 18);
+    fields.writeUInt16LE(name.length, 22);
+    const local = Buffer.concat([Buffer.from("PK\x03\x04"), fields, name, data]);
+    const tail = Buffer.alloc(14);
+    tail.writeUInt32LE(offset, 10);
+    locals.push(local);
+    centrals.push(Buffer.concat([Buffer.from("PK\x01\x02\x14\x00"), fields, tail, name]));
+    offset += local.length;
+  }
+  const central = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.write("PK\x05\x06");
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(central.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, central, end]);
 }
 
 // 偽のReleaseの取得先。zipが無ければ0.3.0の正しいZIPを作る
@@ -367,23 +399,18 @@ describe("適用", () => {
   });
 
   test("ZIPに..・絶対パス・想定外のルートがあれば展開せずに中止する", async (t) => {
-    const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-badzip-"));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
-    const stage = path.join(dir, "stage");
-    put(stage, "src/server.ts", "\n");
-    put(stage, "package.json", JSON.stringify({ version: "0.3.0", nijimaku: { launcher: 1 } }));
-    put(stage, "evil", "evil\n");
-    // bsdtarの-sで、エントリーの名前だけを書き換えたZIPを作る（-Pで先頭の/を残す）
-    const cases: [string, string[], string][] = [
-      ["dotdot", ["-s", ",^evil$,../evil,"], "../evil"],
-      ["absolute", ["-P", "-s", ",^evil$,/tmp/nijimaku-evil,"], "/tmp/nijimaku-evil"],
-      ["root", [], "evil"],
+    const cases: [string, string][] = [
+      ["dotdot", "../evil"],
+      ["absolute", "/tmp/nijimaku-evil"],
+      ["root", "evil"],
     ];
-    for (const [name, args, entry] of cases) {
+    for (const [name, entry] of cases) {
       await t.test(name, async (t) => {
-        const file = path.join(dir, `${name}.zip`);
-        execFileSync(bsdtarPath(), ["-a", "-c", "-f", file, ...args, "-C", stage, "src", "package.json", "evil"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
-        const zip = readFileSync(file);
+        const zip = storedZip([
+          ["src/server.ts", "\n"],
+          ["package.json", JSON.stringify({ version: "0.3.0", nijimaku: { launcher: 1 } })],
+          [entry, "evil\n"],
+        ]);
         await assertFailed(t, releaseRoutes(t, { zip, sha: sha256(zip) }), new RegExp(`想定外の項目があります: ${entry.replaceAll(".", "\\.")}$`));
       });
     }
