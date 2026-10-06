@@ -11,7 +11,7 @@
     "share": "node --env-file-if-exists=.env scripts/share.ts",
     "dist": "node scripts/dist.ts",
     "typecheck": "tsc",
-    "test": "node --test \"src/**/*.test.ts\""
+    "test": "node --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\""
   },
   "dependencies": {
     "openai": "^7.27.0",

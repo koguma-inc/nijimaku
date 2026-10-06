@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { copyFileSync, cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -20,14 +20,18 @@ async function freePort(): Promise<number> {
   return address.port;
 }
 
-test(".env・APIキーなしで画面を配信し、許可URLから設定を変更でき、不正なキーを保存も出力もしない", { timeout: 15000 }, async (t) => {
-  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
-  const sockets: WebSocket[] = [];
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+function copyApp(dir: string): void {
   cpSync(path.join(ROOT, "src"), path.join(dir, "src"), { recursive: true, filter: (src) => !src.endsWith(".test.ts") });
   cpSync(path.join(ROOT, "public"), path.join(dir, "public"), { recursive: true });
   copyFileSync(path.join(ROOT, "package.json"), path.join(dir, "package.json"));
   symlinkSync(path.join(ROOT, "node_modules"), path.join(dir, "node_modules"), "junction");
+}
+
+test(".env・APIキーなしで画面を配信し、許可URLから設定を変更でき、不正なキーを保存も出力もしない", { timeout: 15000 }, async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
+  const sockets: WebSocket[] = [];
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  copyApp(dir);
   const secret = "sk-test-secret";
   writeFileSync(path.join(dir, "credentials.json"), `{"openaiApiKey":"${secret}`);
   const port = await freePort();
@@ -107,5 +111,71 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
     assert.equal(readFileSync(path.join(dir, "credentials.json"), "utf8"), `{"openaiApiKey":"${secret}`);
     socket.close();
     await once(socket, "close");
+  }
+});
+
+// 起動役（src/launcher.ts）から起動されたときの約束
+test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置き、listenの後にreadyを送る", { timeout: 15000 }, async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const appDir = path.join(dir, "app");
+  const dataDir = path.join(dir, "data");
+  mkdirSync(appDir);
+  mkdirSync(dataDir);
+  copyApp(appDir);
+  writeFileSync(path.join(dataDir, "credentials.json"), "{}");
+  const port = await freePort();
+  const child = spawn(process.execPath, [path.join(appDir, "src", "server.ts")], {
+    cwd: dataDir,
+    env: { ...process.env, OPENAI_API_KEY: "", PORT: String(port), SAVE_LOGS: "1", NIJIMAKU_DATA_DIR: dataDir },
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+  });
+  let output = "";
+  child.stdout!.on("data", (data) => { output += data; });
+  child.stderr!.on("data", (data) => { output += data; });
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+      await once(child, "exit");
+    }
+  });
+  const [message] = await Promise.race([
+    once(child, "message"),
+    once(child, "exit").then(() => { throw new Error(`テスト用サーバーが起動前に終了しました: ${output}`); }),
+  ]);
+  assert.deepEqual(message, { type: "ready" });
+  assert.equal((await fetch(`http://127.0.0.1:${port}/`)).status, 200);
+  assert.match(output, /APIキーの保存ファイルの形式が不正です/);
+  assert.ok(existsSync(path.join(dataDir, "logs")));
+  assert.ok(!existsSync(path.join(appDir, "logs")));
+
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: `http://localhost:${port}` } });
+  t.after(() => socket.terminate());
+  await once(socket, "open");
+  socket.send(JSON.stringify({ type: "set", key: "displaySegments", value: 4 }));
+  while (!existsSync(path.join(dataDir, "settings.json"))) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(JSON.parse(readFileSync(path.join(dataDir, "settings.json"), "utf8")).displaySegments, 4);
+  assert.ok(!existsSync(path.join(appDir, "settings.json")));
+});
+
+test("設定の誤りとポートの使用中は、版のせいではない失敗として78で終わる", { timeout: 15000 }, async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  copyApp(dir);
+  const busy = createServer();
+  busy.listen(0, "127.0.0.1");
+  await once(busy, "listening");
+  t.after(() => busy.close());
+  const address = busy.address();
+  assert.ok(address && typeof address !== "string");
+
+  for (const env of [{ LUNA_MODE: "bad" }, { PORT: String(address.port) }]) {
+    const child = spawn(process.execPath, [path.join(dir, "src", "server.ts")], {
+      cwd: dir,
+      env: { ...process.env, OPENAI_API_KEY: "", PORT: String(await freePort()), ...env },
+      stdio: "ignore",
+    });
+    const [code] = await once(child, "exit");
+    assert.equal(code, 78, JSON.stringify(env));
   }
 });

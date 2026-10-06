@@ -23,6 +23,8 @@ Chromeで開いたcapture.htmlが、マイクの音声をローカルのNodeサ�
 
 ### はじめて使うとき
 
+[Releases](https://github.com/koguma-inc/nijimaku/releases)から`nijimaku-<版>-win-x64.zip`をダウンロードする。`nijimaku-<版>-app.zip`には`start.cmd`とNode.jsが入っていないので使わない。
+
 1. ZIPを右クリックして「プロパティ」を開き、「全般」タブの下部にある「許可する」にチェックを入れて「OK」を押す。
    - 展開する前に行う。行わないと起動するときに警告が出る。Windows 11では起動できないこともある。
 2. ZIPを右クリックして「すべて展開」を選ぶ。
@@ -143,4 +145,4 @@ capture.htmlの「設定」パネルで、入力・文字起こし・表示の�
 
 ## ライセンス
 
-MIT（`LICENSE`）。Windowsの配布版に同梱するNode.jsと依存パッケージのライセンスは、それぞれ`node/LICENSE`と`node_modules/`の各パッケージにある。
+MIT（`LICENSE`）。Windowsの配布版に同梱するNode.jsと依存パッケージのライセンスは、それぞれ`node/LICENSE`と`app/versions/<版>/node_modules/`の各パッケージにある。

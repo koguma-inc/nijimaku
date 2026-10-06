@@ -7,5 +7,5 @@ if not exist "node\node.exe" (
   pause
   exit /b 1
 )
-"node\node.exe" --env-file-if-exists=.env src\server.ts --open
+"node\node.exe" --env-file-if-exists=.env app\launcher.ts --open
 if errorlevel 1 pause
