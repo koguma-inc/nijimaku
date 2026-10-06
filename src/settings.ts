@@ -54,34 +54,35 @@ export type Settings = {
 
 export const DEFAULT_STREAM_DESCRIPTION = "YouTubeのライブ配信。配信者一人が日本語で話しています。";
 
-// gpt-live-transcribeのlanguagesに使える値。不正な値を送ったときのAPIのエラーメッセージにある一覧（2026-10-06）
-const TRANSCRIBE_LANGUAGES = ["af", "ar", "az", "be", "bg", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "gl", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "iw", "ja", "kk", "kn", "ko", "lt", "lv", "mi", "mk", "mr", "ms", "ne", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl", "sr", "sv", "sw", "ta", "th", "tl", "tr", "uk", "ur", "vi", "zh"];
+// gpt-live-transcribeのlanguagesに使える値。不正な値を送ったときのAPIのエラーメッセージにある一覧（2026-10-06）。
+// iwはheと同じヘブライ語の旧コードで、画面に同じ言語名が2つ並ぶため除く
+const TRANSCRIBE_LANGUAGES = ["af", "ar", "az", "be", "bg", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "gl", "he", "hi", "hr", "hu", "hy", "id", "is", "it", "ja", "kk", "kn", "ko", "lt", "lv", "mi", "mk", "mr", "ms", "ne", "nl", "no", "pl", "pt", "ro", "ru", "sk", "sl", "sr", "sv", "sw", "ta", "th", "tl", "tr", "uk", "ur", "vi", "zh"];
 
 // 用語集の件数はnekote-voiceで100件まで通ったことの確認だけで、公式の上限ではない
 export const FIELDS: Field[] = [
   { key: "vadThresholdDb", section: "input", label: "発話とみなす音量", kind: "number", min: -80, max: -10, step: 1, unit: "dBFS" },
-  { key: "vadSilenceMs", section: "input", label: "区切る無音の長さ", kind: "number", min: 100, max: 3000, step: 50, unit: "ms" },
+  { key: "vadSilenceMs", section: "input", label: "文を区切る無音の長さ", kind: "number", min: 100, max: 3000, step: 50, unit: "ms" },
   { key: "vadMinSpeechMs", section: "input", label: "発話とみなす最短の長さ", kind: "number", min: 20, max: 2000, step: 20, unit: "ms" },
-  { key: "vadMaxSegmentMs", section: "input", label: "強制的に区切る長さ", kind: "number", min: 3000, max: 60000, step: 1000, unit: "ms" },
+  { key: "vadMaxSegmentMs", section: "input", label: "1文の最大の長さ", kind: "number", min: 3000, max: 60000, step: 1000, unit: "ms", help: "話し続けていても、この長さで区切ります。" },
   { key: "micNoiseSuppression", section: "input", label: "ノイズ抑制（Chrome）", kind: "boolean" },
-  { key: "micAutoGainControl", section: "input", label: "自動ゲイン（Chrome）", kind: "boolean" },
+  { key: "micAutoGainControl", section: "input", label: "自動ゲイン調整（Chrome）", kind: "boolean" },
   { key: "micEchoCancellation", section: "input", label: "エコー除去（Chrome）", kind: "boolean" },
-  { key: "streamDescription", section: "transcription", label: "配信の説明", kind: "textarea", maxLength: 1000, help: "文字起こしのpromptと、Lunaの英訳の前提に使う" },
-  { key: "glossary", section: "transcription", label: "用語集", kind: "glossary", maxItems: 100, maxLength: 100, help: "末尾の空欄に書くと追加。日本語は文字起こしのkeywords、英語との組はLunaの英訳に使う（英語は空でもよい）" },
-  { key: "transcribeLanguages", section: "transcription", label: "言語", kind: "list", maxItems: 10, options: TRANSCRIBE_LANGUAGES, featured: ["ja", "en", "ko", "zh"], help: "どれも選ばなければ指定しない（自動判定）" },
-  { key: "transcribeDelay", section: "transcription", label: "delay", kind: "select", options: ["minimal", "low", "medium", "high", "xhigh"], help: "大きいほど途中経過が遅れ、精度が上がる" },
+  { key: "streamDescription", section: "transcription", label: "配信の説明", kind: "textarea", maxLength: 1000, help: "文字起こしと英訳のAIに、配信の前提として渡します。" },
+  { key: "glossary", section: "transcription", label: "用語集", kind: "glossary", maxItems: 100, maxLength: 100, help: "末尾の空欄に書くと追加されます。日本語は文字起こしの手がかりに使い、英語を入れた語は英訳をその表記に揃えます（英語は空でもかまいません）。" },
+  { key: "transcribeLanguages", section: "transcription", label: "話す言語", kind: "list", maxItems: 10, options: TRANSCRIBE_LANGUAGES, featured: ["ja", "en", "ko", "zh"], help: "配信で話す言語です。どれも選ばなければ自動で判定します。" },
+  { key: "transcribeDelay", section: "transcription", label: "認識の待ち時間", kind: "select", options: ["minimal", "low", "medium", "high", "xhigh"], help: "長いほど途中経過が遅れ、精度が上がります。" },
   { key: "displaySegments", section: "display", label: "表示する文の数", kind: "number", min: 1, max: 10, step: 1 },
-  { key: "styleFont", section: "display", label: "フォント", kind: "font", cssVar: "--nm-font-family", options: ["Noto Sans JP", "Noto Serif JP"], help: "NotoはGoogle Fontsから読み込む（OBSのPCがインターネットにつながっている必要がある）" },
+  { key: "styleFont", section: "display", label: "フォント", kind: "font", cssVar: "--nm-font-family", options: ["Noto Sans JP", "Noto Serif JP"], help: "NotoはGoogle Fontsから読み込みます（OBSのPCがインターネットにつながっている必要があります）。" },
   { key: "styleJaSize", section: "display", label: "日本語の文字の大きさ", kind: "px", cssVar: "--nm-ja-size", min: 8, max: 200 },
   { key: "styleEnSize", section: "display", label: "英語の文字の大きさ", kind: "px", cssVar: "--nm-en-size", min: 8, max: 200 },
-  { key: "styleEnGap", section: "display", label: "日本語と英語の間隔", kind: "px", cssVar: "--nm-en-gap", min: -10, max: 10, help: "行の高さの余白に足す。負の値で詰める" },
+  { key: "styleEnGap", section: "display", label: "日本語と英語の間隔", kind: "px", cssVar: "--nm-en-gap", min: -10, max: 10, help: "0で標準の行間です。負の値で詰めます。" },
   { key: "styleJaColor", section: "display", label: "日本語の色", kind: "color", cssVar: "--nm-ja-color" },
   { key: "styleEnColor", section: "display", label: "英語の色", kind: "color", cssVar: "--nm-en-color" },
-  { key: "stylePartialOpacity", section: "display", label: "途中経過の不透明度", kind: "percent", cssVar: "--nm-partial-opacity", min: 0, max: 100, help: "確定前の文を、縁取りごと薄くする" },
+  { key: "stylePartialOpacity", section: "display", label: "途中経過の不透明度", kind: "percent", cssVar: "--nm-partial-opacity", min: 0, max: 100, help: "確定前の文を、縁取りごと薄くします。" },
   { key: "styleStrokeColor", section: "display", label: "縁取りの色", kind: "color", cssVar: "--nm-stroke-color" },
   { key: "styleStrokeWidth", section: "display", label: "縁取りの太さ", kind: "px", cssVar: "--nm-stroke-width", min: 0, max: 20 },
   { key: "styleBottom", section: "display", label: "下からの位置", kind: "px", cssVar: "--nm-bottom", min: 0, max: 2000 },
-  { key: "styleMaxWidth", section: "display", label: "最大の幅", kind: "px", cssVar: "--nm-max-width", min: 100, max: 4000 },
+  { key: "styleMaxWidth", section: "display", label: "字幕の最大幅", kind: "px", cssVar: "--nm-max-width", min: 100, max: 4000 },
 ];
 
 const FIELD_BY_KEY = new Map(FIELDS.map((f) => [f.key, f]));

@@ -9,9 +9,9 @@ const RT_STATES = {
   unconfigured: { label: "APIキー未設定", tone: "error" },
   connecting: { label: "接続中", tone: "warn" },
   ready: { label: "準備完了", tone: "ok" },
-  rotating: { label: "ローテーション中", tone: "ok" },
+  rotating: { label: "接続切り替え中", tone: "ok" },
   reconnecting: { label: "再接続中", tone: "warn" },
-  failed: { label: "失敗", tone: "error" },
+  failed: { label: "接続できません", tone: "error" },
 };
 const LIVE_LABELS = { off: "停止中", wait: "準備中", on: "LIVE" };
 const TAB_STORAGE_KEY = "nijimaku.captureTab";
@@ -161,7 +161,7 @@ async function applyMic() {
   }
   const actual = track.getSettings();
   if (!MIC_KEYS.every((k) => actual[k] === mic[k])) {
-    setMessage("マイクの加工の切り替えは、停止→開始で反映されます");
+    setMessage("ノイズ抑制・自動ゲイン調整・エコー除去の切り替えは、停止→開始で反映されます。");
   }
 }
 
@@ -176,7 +176,7 @@ function stopMeter() {
 
 function onTrackEnded() {
   stop();
-  setMessage("マイクが切断されました", true);
+  setMessage("マイクが切断されました。", true);
 }
 
 function stopAudio() {
@@ -262,7 +262,7 @@ function connect() {
   const socket = new WebSocket(`${proto}//${location.host}/ws/capture`);
   socket.binaryType = "arraybuffer";
   ws = socket;
-  setWsState("接続中…", "warn");
+  setWsState("接続中", "warn");
   updateButtons();
 
   socket.onopen = () => {
@@ -294,8 +294,8 @@ function connect() {
     if (ev.code === 4001) {
       // 置き換えられた側が再接続すると入力を奪い合うため、開始が押されるまで繋がない
       stopAudio();
-      setWsState("切断（置き換え）", "error");
-      setMessage("別の入力に切り替わりました", true);
+      setWsState("切断（別のページで開始）", "error");
+      setMessage("別のタブやPCのページで開始されたため、このページからの送信を止めました。", true);
       updateButtons();
       return;
     }
@@ -328,7 +328,7 @@ function copyStyleSheets(targetDoc) {
 
 async function openPip() {
   if (documentPictureInPicture.window) {
-    setMessage("字幕のPiPは既に開いています");
+    setMessage("字幕のPiPは既に開いています。");
     return;
   }
   let pipWin;

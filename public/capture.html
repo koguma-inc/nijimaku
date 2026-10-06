@@ -17,8 +17,8 @@
         --cap-surface: #18181b;
         --cap-raised: #1f1f23;
         --cap-hover: #2a2a30;
-        --cap-border: #303037;
-        --cap-border-strong: #43434c;
+        --cap-border: #36363d;
+        --cap-border-strong: #494951;
         --cap-text: #ededef;
         --cap-muted: #a1a1aa;
         --cap-faint: #71717a;
@@ -1064,7 +1064,7 @@
         <div class="cap-output-item">
           <div>
             <h2>OBS用URL</h2>
-            <p class="cap-note">ブラウザソースのURLに入れる。幅と高さは配信の解像度（例: 1920×1080）にする。</p>
+            <p class="cap-note">ブラウザソースのURLに入れます。幅と高さは配信の解像度（例: 1920×1080）にします。</p>
           </div>
           <div class="cap-url">
             <input type="text" id="cap-overlay-url" readonly spellcheck="false" aria-label="字幕ページのURL" value="./overlay.html" />
@@ -1075,7 +1075,7 @@
         <div class="cap-output-item">
           <div>
             <h2>手元モニター</h2>
-            <p class="cap-note">配信中に字幕が出ているか、他の画面より常に手前に出てくる小さな画面で確認できます。</p>
+            <p class="cap-note">他のウィンドウより常に手前に出る小さなウィンドウで、配信中の字幕を確認できます。</p>
             <p class="cap-note is-warn" id="cap-pip-note"></p>
           </div>
           <div>
@@ -1092,7 +1092,7 @@
         <div class="cap-tabs" role="tablist" aria-label="設定の種類">
           <button type="button" class="cap-tab" role="tab" id="cap-tab-display" data-tab="display" aria-controls="cap-panel-display">表示</button>
           <button type="button" class="cap-tab" role="tab" id="cap-tab-input" data-tab="input" aria-controls="cap-panel-input">入力</button>
-          <button type="button" class="cap-tab" role="tab" id="cap-tab-transcription" data-tab="transcription" aria-controls="cap-panel-transcription">文字起こし・英訳</button>
+          <button type="button" class="cap-tab" role="tab" id="cap-tab-transcription" data-tab="transcription" aria-controls="cap-panel-transcription">文字起こし</button>
           <button type="button" class="cap-tab" role="tab" id="cap-tab-key" data-tab="key" aria-controls="cap-panel-key">APIキー</button>
         </div>
         <p class="cap-message" id="cap-settings-message" role="status" aria-live="polite"></p>
@@ -1102,14 +1102,14 @@
             <figure class="cap-preview-wrap">
               <figcaption class="cap-preview-head">プレビュー<span class="cap-chip">OBS 1920×1080</span></figcaption>
               <div class="cap-preview" id="cap-preview"></div>
-              <p class="cap-field-hint">見本の字幕を、1920×1080のOBSの画面に出したときの見え方で縮小表示する。PiPでは大きさが2/3になり、位置はPiP用の値になる。</p>
+              <p class="cap-field-hint">見本の字幕を、1920×1080のOBSの画面に出したときの見え方で縮小表示します。PiPでは大きさが2/3になり、「下からの位置」は反映されません（下端に寄せて出ます）。</p>
             </figure>
             <div class="cap-fields" data-section="display"></div>
           </div>
         </div>
 
         <div class="cap-panel" role="tabpanel" id="cap-panel-input" aria-labelledby="cap-tab-input" hidden>
-          <p class="cap-note">メーターの白い線が「発話とみなす音量」。話していないときの音量より上、話しているときの音量より下に合わせる。</p>
+          <p class="cap-note">メーターの白い線が「発話とみなす音量」です。話していないときの音量より上、話しているときの音量より下に合わせます。</p>
           <div class="cap-fields" data-section="input"></div>
         </div>
 
@@ -1124,7 +1124,7 @@
               <input type="password" id="cap-api-key" autocomplete="off" spellcheck="false" maxlength="1024" required disabled />
               <button type="submit" class="cap-btn cap-btn-primary" id="cap-api-key-save" disabled>保存</button>
             </div>
-            <span class="cap-key-state" id="cap-api-key-state" role="status" aria-live="polite">接続中…</span>
+            <span class="cap-key-state" id="cap-api-key-state" role="status" aria-live="polite">接続中</span>
           </form>
           <div class="cap-key-actions">
             <p class="cap-field-hint">APIキーはこのPCに保存されます。保存済みのキーは画面に表示されません。</p>

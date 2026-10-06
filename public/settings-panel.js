@@ -70,7 +70,9 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
   const keyReset = card.querySelector("#cap-api-key-reset");
   const keyState = card.querySelector("#cap-api-key-state");
   const keyMessage = card.querySelector("#cap-api-key-message");
-  let keyPending = false;
+  // サーバーは保存にも削除にもcredentials.savedで応えるため、どちらを送ったかを覚えておく
+  /** @type {"" | "set" | "reset"} */
+  let keyPending = "";
 
   function setKeyMessage(text, isError = false) {
     keyMessage.textContent = text;
@@ -78,28 +80,28 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
   }
 
   function updateKeyButtons() {
-    const disabled = keyPending || ws?.readyState !== WebSocket.OPEN;
+    const disabled = keyPending !== "" || ws?.readyState !== WebSocket.OPEN;
     keyInput.disabled = keySave.disabled = keyReset.disabled = disabled;
   }
 
   keyForm.addEventListener("submit", (ev) => {
     ev.preventDefault();
     if (keyPending || !send({ type: "credentials.set", apiKey: keyInput.value })) return;
-    keyPending = true;
+    keyPending = "set";
     setKeyMessage("保存中…");
     updateKeyButtons();
   });
 
   keyReset.addEventListener("click", () => {
     if (keyPending || !send({ type: "credentials.reset" })) return;
-    keyPending = true;
+    keyPending = "reset";
     setKeyMessage("削除中…");
     updateKeyButtons();
   });
 
   function renderCredentials(msg) {
     keyReset.hidden = !msg.saved;
-    keyInput.placeholder = msg.configured ? "変更するAPIキーを入力" : "APIキーを入力";
+    keyInput.placeholder = msg.configured ? "新しいAPIキーを入力" : "APIキーを入力";
     keyState.dataset.tone = !msg.configured || msg.state === "failed" ? "error" : msg.state === "ready" ? "ok" : "warn";
     const states = { connecting: "接続中", ready: "接続済み", rotating: "接続切り替え中", reconnecting: "再接続中", failed: "接続できません" };
     keyState.textContent = msg.configured
@@ -481,11 +483,11 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
       else if (msg?.type === "credentials.status") renderCredentials(msg);
       else if (msg?.type === "credentials.saved") {
         keyInput.value = "";
-        keyPending = false;
-        setKeyMessage("APIキーの設定を保存しました。");
+        setKeyMessage(keyPending === "reset" ? "保存したキーを削除しました。" : "APIキーを保存しました。");
+        keyPending = "";
         updateKeyButtons();
       } else if (msg?.type === "credentials.error") {
-        keyPending = false;
+        keyPending = "";
         setKeyMessage(String(msg.message), true);
         updateKeyButtons();
       }
@@ -494,7 +496,7 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
       if (ws !== socket) return;
       ws = null;
       keyInput.value = "";
-      keyPending = false;
+      keyPending = "";
       keyState.textContent = "サーバーとの接続が切れました。再接続中…";
       keyState.dataset.tone = "warn";
       setKeyMessage("");
