@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -27,10 +27,24 @@ function copyApp(dir: string): void {
   symlinkSync(path.join(ROOT, "node_modules"), path.join(dir, "node_modules"), "junction");
 }
 
+// 子プロセスの終了を待ってから一時フォルダを消す。Windowsでは、動いているプロセスの作業フォルダを消せない。
+// t.afterは登録順に走り、1つが失敗すると残りが走らないので、分けて登録せずこの順で1つにまとめる
+async function cleanup(dir: string, children: ChildProcess[], sockets: WebSocket[] = []): Promise<void> {
+  for (const socket of sockets) socket.terminate();
+  for (const child of children) {
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+      await once(child, "exit");
+    }
+  }
+  rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+}
+
 test(".env・APIキーなしで画面を配信し、許可URLから設定を変更でき、不正なキーを保存も出力もしない", { timeout: 15000 }, async (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
+  const children: ChildProcess[] = [];
   const sockets: WebSocket[] = [];
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  t.after(() => cleanup(dir, children, sockets));
   copyApp(dir);
   const secret = "sk-test-secret";
   writeFileSync(path.join(dir, "credentials.json"), `{"openaiApiKey":"${secret}`);
@@ -43,16 +57,10 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
     env: { ...process.env, OPENAI_API_KEY: "", PORT: String(port), ALLOWED_ORIGINS: "https://shared.example" },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  children.push(child);
   let output = "";
   child.stdout.on("data", (data) => { output += data; });
   child.stderr.on("data", (data) => { output += data; });
-  t.after(async () => {
-    for (const socket of sockets) socket.terminate();
-    if (child.exitCode === null && child.signalCode === null) {
-      child.kill("SIGTERM");
-      await once(child, "exit");
-    }
-  });
   await new Promise<void>((resolve, reject) => {
     child.stdout.on("data", () => { if (output.includes("capture:")) resolve(); });
     child.once("error", reject);
@@ -132,7 +140,9 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
 // 起動役（src/launcher.ts）から起動されたときの約束
 test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置き、listenの後にreadyを送る", { timeout: 15000 }, async (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const children: ChildProcess[] = [];
+  const sockets: WebSocket[] = [];
+  t.after(() => cleanup(dir, children, sockets));
   const appDir = path.join(dir, "app");
   const dataDir = path.join(dir, "data");
   mkdirSync(appDir);
@@ -146,15 +156,10 @@ test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置
     env: { ...process.env, OPENAI_API_KEY: "", PORT: String(port), SAVE_LOGS: "1", NIJIMAKU_DATA_DIR: dataDir, NIJIMAKU_LAUNCHER: "1", NIJIMAKU_UPDATE_API: `http://127.0.0.1:${await freePort()}/releases/latest` },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
+  children.push(child);
   let output = "";
   child.stdout!.on("data", (data) => { output += data; });
   child.stderr!.on("data", (data) => { output += data; });
-  t.after(async () => {
-    if (child.exitCode === null && child.signalCode === null) {
-      child.kill("SIGTERM");
-      await once(child, "exit");
-    }
-  });
   const [message] = await Promise.race([
     once(child, "message"),
     once(child, "exit").then(() => { throw new Error(`テスト用サーバーが起動前に終了しました: ${output}`); }),
@@ -166,7 +171,7 @@ test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置
   assert.ok(!existsSync(path.join(appDir, "logs")));
 
   const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: `http://localhost:${port}` } });
-  t.after(() => socket.terminate());
+  sockets.push(socket);
   const messages: Record<string, unknown>[] = [];
   socket.on("message", (raw) => messages.push(JSON.parse(raw.toString())));
   await once(socket, "open");
@@ -183,7 +188,8 @@ test("起動役の子として、利用者のデータをNIJIMAKU_DATA_DIRに置
 
 test("設定の誤りとポートの使用中は、版のせいではない失敗として78で終わる", { timeout: 15000 }, async (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const children: ChildProcess[] = [];
+  t.after(() => cleanup(dir, children));
   copyApp(dir);
   const busy = createServer();
   busy.listen(0, "127.0.0.1");
@@ -198,6 +204,7 @@ test("設定の誤りとポートの使用中は、版のせいではない失�
       env: { ...process.env, OPENAI_API_KEY: "", PORT: String(await freePort()), ...env },
       stdio: "ignore",
     });
+    children.push(child);
     const [code] = await once(child, "exit");
     assert.equal(code, 78, JSON.stringify(env));
   }

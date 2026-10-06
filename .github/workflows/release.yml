@@ -29,7 +29,9 @@ jobs:
           package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # 子プロセスが残るとテストが終わらないので、ジョブの上限まで待たずに打ち切る
       - run: pnpm test
+        timeout-minutes: 5
       - name: タグと版の一致を確かめる
         if: github.ref_type == 'tag'
         run: |
