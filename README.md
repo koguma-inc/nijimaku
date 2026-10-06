@@ -140,3 +140,7 @@ capture.htmlの「設定」パネルで、入力・文字起こし・表示の�
 - captureとoverlayのWebSocketは、`Origin`が`http://localhost:PORT`か`http://127.0.0.1:PORT`、または`ALLOWED_ORIGINS`（`nr share`が設定する）のページからだけ受け付ける。`Origin`の無い接続（同じPCの`replay.ts`等）は受け付ける。同じPCの他のプロセスは信頼する前提。
 - 設定パネルのWebSocket（`/ws/settings`）も上と同じ`Origin`のページから受け付けるが、`Origin`の無い接続は拒否する。`Origin`のチェックは別サイトのブラウザからの操作を防ぐためのもので、利用者の認証ではない。`nr share`中は、公開URLを知る人が設定とAPIキーを変更・削除できる（保存済みのキーは読めない）。ブラウザ以外のクライアントは`Origin`を偽装できる。公開URLは信頼する相手にだけ共有する。
 - APIキーの保存・削除も`/ws/settings`を使い、通常の設定の送信やログにはキーを含めない。
+
+## ライセンス
+
+MIT（`LICENSE`）。Windowsの配布版に同梱するNode.jsと依存パッケージのライセンスは、それぞれ`node/LICENSE`と`node_modules/`の各パッケージにある。

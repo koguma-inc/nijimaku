@@ -27,6 +27,7 @@ try {
 
   const files = [
     "README.md",
+    "LICENSE",
     ...listFiles("src", (name) => name.endsWith(".ts") && !name.endsWith(".test.ts")),
     ...listFiles("public", (name) => PUBLIC_EXTS.has(path.extname(name))),
   ];
