@@ -4,49 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nijimaku capture</title>
+    <link rel="stylesheet" href="./base.css" />
     <!-- PiPへスタイルシートをコピーするため、字幕のCSSもここで読み込む -->
     <link rel="stylesheet" href="./overlay.css" />
     <style>
       /* PiPにもコピーされるため、すべてbody.cap-page配下に限定する（変数も:rootに置かない） */
-      html:has(body.cap-page) {
-        color-scheme: dark;
-        background: #111113;
-      }
       body.cap-page {
-        --cap-bg: #111113;
-        --cap-surface: #18181b;
-        --cap-raised: #1f1f23;
-        --cap-hover: #2a2a30;
-        --cap-border: #36363d;
-        --cap-border-strong: #494951;
-        --cap-text: #ededef;
-        --cap-muted: #a1a1aa;
-        --cap-faint: #71717a;
-        --cap-note: #c4c4cc;
-        --cap-accent: #4c8ff8;
-        --cap-accent-hover: #67a2fa;
-        --cap-accent-soft: rgba(76, 143, 248, 0.15);
         /* 枠線の下に繰り返した端がはみ出さないよう、枠線ごと1枚で塗る */
         --cap-go: linear-gradient(120deg, #ff5fa2 0%, #b46bff 50%, #4fa9ff 100%) 0 0 / 180% 100% no-repeat border-box;
-        --cap-ok: #46a758;
-        --cap-warn: #f5b544;
-        --cap-error: #ef5f5f;
-        --cap-live: #e5484d;
         --cap-console-h: 0px;
 
         min-height: 100vh;
-        margin: 0;
-        font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
-        font-size: 14px;
+        font-size: var(--ui-fz-s);
         line-height: 1.6;
-        color: var(--cap-text);
-        background: var(--cap-bg);
-        -webkit-font-smoothing: antialiased;
-      }
-      body.cap-page *,
-      body.cap-page *::before,
-      body.cap-page *::after {
-        box-sizing: border-box;
       }
       /* display指定のある要素でもhiddenで消す。リセットボタンだけは列の幅を保つため場所を残す */
       body.cap-page [hidden]:not(.cap-field-reset) {
@@ -60,11 +30,7 @@
         margin: 0;
       }
       body.cap-page a {
-        color: var(--cap-text);
-      }
-      body.cap-page :is(button, a, summary, input[type="checkbox"], input[type="range"], input[type="color"]):focus-visible {
-        outline: 2px solid var(--cap-accent);
-        outline-offset: 2px;
+        color: var(--ui-text);
       }
 
       /* --- 骨組み --- */
@@ -89,13 +55,13 @@
         gap: 2px 12px;
       }
       body.cap-page h1 {
-        font-size: 18px;
+        font-size: var(--ui-fz-xl);
         font-weight: 700;
         letter-spacing: -0.01em;
       }
       body.cap-page .cap-tagline {
-        font-size: 13px;
-        color: var(--cap-muted);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-header-side {
         display: flex;
@@ -105,18 +71,18 @@
         gap: 8px 16px;
       }
       body.cap-page .cap-version {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px;
-        color: var(--cap-faint);
+        font-family: var(--ui-font-mono);
+        font-size: var(--ui-fz-xs);
+        color: var(--ui-faint);
       }
       body.cap-page .cap-help {
-        font-size: 13px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
         text-underline-offset: 3px;
       }
       body.cap-page .cap-help:hover {
-        color: var(--cap-text);
+        color: var(--ui-text);
       }
       body.cap-page .cap-live {
         display: inline-flex;
@@ -124,11 +90,11 @@
         gap: 7px;
         height: 28px;
         padding: 0 12px;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 6px;
-        font-size: 12px;
+        font-size: var(--ui-fz-xs);
         font-weight: 700;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
         white-space: nowrap;
       }
       body.cap-page .cap-live::before {
@@ -140,11 +106,11 @@
       }
       body.cap-page[data-live="wait"] .cap-live {
         border-color: rgba(245, 181, 68, 0.4);
-        color: var(--cap-warn);
+        color: var(--ui-warn);
       }
       body.cap-page[data-live="on"] .cap-live {
-        border-color: var(--cap-live);
-        background: var(--cap-live);
+        border-color: var(--ui-live);
+        background: var(--ui-live);
         color: #fff;
         letter-spacing: 0.06em;
       }
@@ -163,7 +129,7 @@
         padding: 14px 16px 14px 18px;
         border: 1px solid rgba(76, 143, 248, 0.45);
         border-radius: 12px;
-        background: var(--cap-accent-soft);
+        background: var(--ui-accent-soft);
       }
       body.cap-page .cap-update-main {
         display: grid;
@@ -171,7 +137,7 @@
         min-width: 0;
       }
       body.cap-page .cap-update-title {
-        font-size: 14px;
+        font-size: var(--ui-fz-m);
         font-weight: 700;
       }
       body.cap-page .cap-update-actions {
@@ -184,34 +150,34 @@
         border: 1px solid rgba(245, 181, 68, 0.35);
         border-radius: 8px;
         background: rgba(245, 181, 68, 0.06);
-        font-size: 13px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
-        color: var(--cap-warn);
+        color: var(--ui-warn);
       }
 
       body.cap-page .cap-card {
         display: grid;
         gap: 16px;
         padding: 20px;
-        border: 1px solid var(--cap-border);
+        border: 1px solid var(--ui-border);
         border-radius: 12px;
-        background: var(--cap-surface);
+        background: var(--ui-surface);
       }
       body.cap-page h2 {
-        font-size: 14.5px;
+        font-size: var(--ui-fz-l);
         font-weight: 700;
-        line-height: 1.4;
+        line-height: 1.5;
       }
       body.cap-page .cap-note {
-        font-size: 12.5px;
-        color: var(--cap-note);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-note);
       }
       body.cap-page .cap-note.is-warn {
-        color: var(--cap-warn);
+        color: var(--ui-warn);
       }
       body.cap-page .cap-message {
-        font-size: 13px;
-        color: var(--cap-muted);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-muted);
         white-space: pre-wrap;
       }
       body.cap-page .cap-message:empty {
@@ -223,7 +189,7 @@
         border-radius: 8px;
         background: rgba(239, 95, 95, 0.07);
         font-weight: 600;
-        color: var(--cap-error);
+        color: var(--ui-error);
       }
 
       /* --- ボタン --- */
@@ -239,19 +205,19 @@
         gap: 8px;
         height: 36px;
         padding: 0 14px;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 8px;
-        background: var(--cap-raised);
-        font-size: 13.5px;
+        background: var(--ui-raised);
+        font-size: var(--ui-fz-s);
         font-weight: 600;
-        color: var(--cap-text);
+        color: var(--ui-text);
         text-decoration: none;
         white-space: nowrap;
         cursor: pointer;
         transition: background 0.12s, border-color 0.12s, color 0.12s;
       }
       body.cap-page .cap-btn:hover:not(:disabled) {
-        background: var(--cap-hover);
+        background: var(--ui-hover);
       }
       body.cap-page .cap-btn:disabled {
         opacity: 0.45;
@@ -259,16 +225,16 @@
       }
       body.cap-page .cap-btn-primary {
         border-color: transparent;
-        background: var(--cap-accent);
+        background: var(--ui-accent);
         color: #fff;
       }
       body.cap-page .cap-btn-primary:hover:not(:disabled) {
-        background: var(--cap-accent-hover);
+        background: var(--ui-accent-hover);
       }
       body.cap-page .cap-btn-danger {
         border-color: rgba(239, 95, 95, 0.4);
         background: transparent;
-        color: var(--cap-error);
+        color: var(--ui-error);
       }
       body.cap-page .cap-btn-danger:hover:not(:disabled) {
         background: rgba(239, 95, 95, 0.1);
@@ -276,8 +242,8 @@
       body.cap-page .cap-btn.is-done,
       body.cap-page .cap-btn.is-done:hover:not(:disabled) {
         border-color: rgba(70, 167, 88, 0.55);
-        background: var(--cap-raised);
-        color: var(--cap-ok);
+        background: var(--ui-raised);
+        color: var(--ui-ok);
       }
 
       /* --- コンソール（開始・マイク・メーター・状態） --- */
@@ -287,9 +253,9 @@
         display: grid;
         gap: 14px;
         padding: 18px 20px;
-        border: 1px solid var(--cap-border);
+        border: 1px solid var(--ui-border);
         border-radius: 12px;
-        background: var(--cap-surface);
+        background: var(--ui-surface);
       }
       body.cap-page .cap-console-main {
         display: grid;
@@ -308,7 +274,7 @@
         padding: 0 24px;
         border: 1px solid transparent;
         border-radius: 10px;
-        font-size: 15px;
+        font-size: var(--ui-fz-m);
         font-weight: 700;
         cursor: pointer;
         transition: background 0.12s, color 0.12s, border-color 0.12s;
@@ -329,9 +295,9 @@
         background-position: 100% 0;
       }
       body.cap-page .cap-go:disabled {
-        border-color: var(--cap-border);
-        background: var(--cap-raised);
-        color: var(--cap-faint);
+        border-color: var(--ui-border);
+        background: var(--ui-raised);
+        color: var(--ui-faint);
         box-shadow: none;
         cursor: not-allowed;
       }
@@ -363,9 +329,9 @@
       }
       body.cap-page .cap-device label {
         flex: none;
-        font-size: 12px;
+        font-size: var(--ui-fz-xs);
         font-weight: 600;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-device select {
         flex: 1;
@@ -388,13 +354,13 @@
         inset: 0;
         overflow: hidden;
         border-radius: 3px;
-        background: linear-gradient(90deg, var(--cap-ok) 0 66.7%, var(--cap-warn) 66.7% 85%, var(--cap-live) 85%);
+        background: linear-gradient(90deg, var(--ui-ok) 0 66.7%, var(--ui-warn) 66.7% 85%, var(--ui-live) 85%);
       }
       body.cap-page .cap-meter-track::after {
         content: "";
         position: absolute;
         inset: 0;
-        background: repeating-linear-gradient(90deg, transparent 0 4px, var(--cap-surface) 4px 6px);
+        background: repeating-linear-gradient(90deg, transparent 0 4px, var(--ui-surface) 4px 6px);
         pointer-events: none;
       }
       body.cap-page .cap-meter-bar {
@@ -411,18 +377,18 @@
         width: 2px;
         margin-left: -1px;
         border-radius: 1px;
-        background: var(--cap-text);
+        background: var(--ui-text);
       }
       body.cap-page .cap-meter-value {
         min-width: 6.5em;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px;
+        font-family: var(--ui-font-mono);
+        font-size: var(--ui-fz-xs);
         font-variant-numeric: tabular-nums;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
         text-align: right;
       }
       body.cap-page .cap-meter.is-over + .cap-meter-value {
-        color: var(--cap-ok);
+        color: var(--ui-ok);
       }
 
       body.cap-page .cap-stats {
@@ -435,51 +401,51 @@
         align-items: center;
         column-gap: 10px;
         padding: 7px 12px;
-        border: 1px solid var(--cap-border);
+        border: 1px solid var(--ui-border);
         border-radius: 8px;
-        background: var(--cap-bg);
+        background: var(--ui-bg);
       }
       body.cap-page .cap-stat::before {
         content: "";
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: var(--cap-faint);
+        background: var(--ui-faint);
       }
       body.cap-page .cap-stat dt {
-        font-size: 11px;
+        font-size: var(--ui-fz-xs);
         font-weight: 600;
         line-height: 1.4;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-stat dd {
         grid-column: 2;
-        font-size: 13px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
         line-height: 1.45;
         overflow-wrap: anywhere;
       }
       body.cap-page .cap-stat-detail {
         display: block;
-        font-size: 11.5px;
+        font-size: var(--ui-fz-xs);
         font-weight: 400;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-stat-detail:empty {
         display: none;
       }
       body.cap-page :is(.cap-stat, .cap-key-state)[data-tone="ok"]::before {
-        background: var(--cap-ok);
+        background: var(--ui-ok);
       }
       body.cap-page :is(.cap-stat, .cap-key-state)[data-tone="warn"]::before {
-        background: var(--cap-warn);
+        background: var(--ui-warn);
         animation: cap-blink 1s steps(1) infinite;
       }
       body.cap-page :is(.cap-stat, .cap-key-state)[data-tone="error"]::before {
-        background: var(--cap-error);
+        background: var(--ui-error);
       }
       body.cap-page .cap-stat[data-tone="error"] dd {
-        color: var(--cap-error);
+        color: var(--ui-error);
       }
 
       body.cap-page .cap-setup {
@@ -514,7 +480,10 @@
         bottom: 0;
         left: -20px;
         width: 1px;
-        background: var(--cap-border);
+        background: var(--ui-border);
+      }
+      body.cap-page .cap-output-item h2 + .cap-note {
+        margin-top: 6px;
       }
       body.cap-page .cap-url {
         display: flex;
@@ -523,8 +492,8 @@
       body.cap-page .cap-url input {
         flex: 1;
         min-width: 0;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12.5px;
+        font-family: var(--ui-font-mono);
+        font-size: var(--ui-fz-s);
       }
 
       /* --- 入力欄 --- */
@@ -532,12 +501,12 @@
       body.cap-page :where(select, input[type="text"], input[type="password"], input[type="number"], textarea) {
         height: 36px;
         padding: 0 11px;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 8px;
-        background-color: var(--cap-bg);
+        background-color: var(--ui-bg);
         font: inherit;
-        font-size: 13.5px;
-        color: var(--cap-text);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-text);
         transition: border-color 0.12s, box-shadow 0.12s;
       }
       body.cap-page textarea {
@@ -550,16 +519,16 @@
         border-color: #565660;
       }
       body.cap-page :is(select, input[type="text"], input[type="password"], input[type="number"], textarea):focus {
-        border-color: var(--cap-accent);
+        border-color: var(--ui-accent);
         outline: none;
-        box-shadow: 0 0 0 3px var(--cap-accent-soft);
+        box-shadow: 0 0 0 3px var(--ui-accent-soft);
       }
       body.cap-page :is(select, input, textarea):disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
       body.cap-page ::placeholder {
-        color: var(--cap-faint);
+        color: var(--ui-faint);
       }
       /* Chromeの標準の矢印は右端に寄るため、自前で描いて右に余白を取る */
       body.cap-page select {
@@ -583,7 +552,7 @@
         gap: 4px 16px;
       }
       body.cap-page .cap-settings-head h2 {
-        font-size: 16px;
+        font-size: var(--ui-fz-l);
       }
       body.cap-page .cap-tabs {
         display: flex;
@@ -592,9 +561,9 @@
         max-width: 100%;
         padding: 3px;
         overflow-x: auto;
-        border: 1px solid var(--cap-border);
+        border: 1px solid var(--ui-border);
         border-radius: 10px;
-        background: var(--cap-bg);
+        background: var(--ui-bg);
       }
       body.cap-page .cap-tab {
         flex: none;
@@ -603,19 +572,19 @@
         border: 0;
         border-radius: 7px;
         background: transparent;
-        font-size: 13.5px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
         white-space: nowrap;
         cursor: pointer;
         transition: color 0.12s, background 0.12s;
       }
       body.cap-page .cap-tab:hover {
-        color: var(--cap-text);
+        color: var(--ui-text);
       }
       body.cap-page .cap-tab[aria-selected="true"] {
-        background: var(--cap-hover);
-        color: var(--cap-text);
+        background: var(--ui-hover);
+        color: var(--ui-text);
       }
       body.cap-page .cap-tab.has-alert::after {
         content: "";
@@ -625,7 +594,7 @@
         margin-left: 7px;
         vertical-align: middle;
         border-radius: 50%;
-        background: var(--cap-error);
+        background: var(--ui-error);
       }
       body.cap-page .cap-panel {
         display: grid;
@@ -650,22 +619,22 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        font-size: 13px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
       }
       body.cap-page .cap-chip {
         padding: 1px 7px;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 5px;
-        font-size: 11px;
+        font-size: var(--ui-fz-xs);
         font-weight: 500;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-preview {
         position: relative;
         aspect-ratio: 16 / 9;
         overflow: hidden;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 8px;
         /* OBSでは背景が透過するので、市松模様で見せる */
         background: repeating-conic-gradient(#1c1c20 0 25%, #242428 0 50%) 0 0 / 16px 16px;
@@ -687,7 +656,7 @@
       }
       body.cap-page .cap-field-label {
         padding-top: 7px;
-        font-size: 13.5px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
       }
       body.cap-page .cap-field-control {
@@ -700,8 +669,8 @@
         align-items: center;
         gap: 10px;
         min-height: 36px;
-        font-size: 12.5px;
-        color: var(--cap-muted);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-field-control :is(select, textarea, input[type="text"], input[type="password"]) {
         width: 100%;
@@ -727,30 +696,30 @@
       body.cap-page .cap-field-control input.cap-color-text {
         flex: 1;
         max-width: 15rem;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12.5px;
+        font-family: var(--ui-font-mono);
+        font-size: var(--ui-fz-s);
       }
       body.cap-page .cap-field-hint {
-        font-size: 12.5px;
+        font-size: var(--ui-fz-s);
         line-height: 1.55;
-        color: var(--cap-note);
+        color: var(--ui-note);
       }
       body.cap-page .cap-field-reset {
         height: 28px;
         margin-top: 4px;
         padding: 0 10px;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 6px;
         background: transparent;
-        font-size: 12px;
+        font-size: var(--ui-fz-xs);
         font-weight: 600;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
         cursor: pointer;
         transition: background 0.12s, color 0.12s;
       }
       body.cap-page .cap-field-reset:hover {
-        background: var(--cap-hover);
-        color: var(--cap-text);
+        background: var(--ui-hover);
+        color: var(--ui-text);
       }
 
       body.cap-page input.cap-range {
@@ -766,7 +735,7 @@
       body.cap-page input.cap-range::-webkit-slider-runnable-track {
         height: 4px;
         border-radius: 2px;
-        background: linear-gradient(var(--cap-accent), var(--cap-accent)) 0 0 / var(--cap-fill) 100% no-repeat, var(--cap-border-strong);
+        background: linear-gradient(var(--ui-accent), var(--ui-accent)) 0 0 / var(--cap-fill) 100% no-repeat, var(--ui-border-strong);
       }
       body.cap-page input.cap-range::-webkit-slider-thumb {
         width: 14px;
@@ -774,7 +743,7 @@
         margin-top: -5px;
         border: 0;
         border-radius: 50%;
-        background: var(--cap-text);
+        background: var(--ui-text);
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         appearance: none;
       }
@@ -785,19 +754,19 @@
       body.cap-page input.cap-range::-moz-range-track {
         height: 4px;
         border-radius: 2px;
-        background: var(--cap-border-strong);
+        background: var(--ui-border-strong);
       }
       body.cap-page input.cap-range::-moz-range-progress {
         height: 4px;
         border-radius: 2px;
-        background: var(--cap-accent);
+        background: var(--ui-accent);
       }
       body.cap-page input.cap-range::-moz-range-thumb {
         width: 14px;
         height: 14px;
         border: 0;
         border-radius: 50%;
-        background: var(--cap-text);
+        background: var(--ui-text);
       }
 
       body.cap-page input.cap-switch {
@@ -807,7 +776,7 @@
         height: 20px;
         margin: 0;
         border-radius: 999px;
-        background: var(--cap-border-strong);
+        background: var(--ui-border-strong);
         appearance: none;
         cursor: pointer;
         transition: background 0.15s;
@@ -820,11 +789,11 @@
         width: 16px;
         height: 16px;
         border-radius: 50%;
-        background: var(--cap-muted);
+        background: var(--ui-muted);
         transition: transform 0.15s, background 0.15s;
       }
       body.cap-page input.cap-switch:checked {
-        background: var(--cap-accent);
+        background: var(--ui-accent);
       }
       body.cap-page input.cap-switch:checked::before {
         background: #fff;
@@ -836,7 +805,7 @@
         width: 36px;
         height: 36px;
         padding: 0;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 8px;
         background: transparent;
         appearance: none;
@@ -865,7 +834,7 @@
         gap: 8px;
       }
       body.cap-page .cap-glossary-arrow {
-        color: var(--cap-faint);
+        color: var(--ui-faint);
       }
       body.cap-page .cap-glossary-row button {
         width: 30px;
@@ -874,14 +843,14 @@
         border: 1px solid transparent;
         border-radius: 6px;
         background: transparent;
-        font-size: 17px;
+        font-size: var(--ui-fz-l);
         line-height: 1;
-        color: var(--cap-muted);
+        color: var(--ui-muted);
         cursor: pointer;
       }
       body.cap-page .cap-glossary-row button:hover {
         background: rgba(239, 95, 95, 0.1);
-        color: var(--cap-error);
+        color: var(--ui-error);
       }
       /* 末尾の空行は追加用で消せないので、削除ボタンを見せない */
       body.cap-page .cap-glossary-row button:disabled {
@@ -903,10 +872,10 @@
         gap: 7px;
         height: 32px;
         padding: 0 12px 0 10px;
-        border: 1px solid var(--cap-border-strong);
+        border: 1px solid var(--ui-border-strong);
         border-radius: 6px;
-        background: var(--cap-bg);
-        font-size: 13px;
+        background: var(--ui-bg);
+        font-size: var(--ui-fz-s);
         cursor: pointer;
         transition: border-color 0.12s, background 0.12s;
       }
@@ -914,17 +883,17 @@
         border-color: #565660;
       }
       body.cap-page .cap-checks label:has(input:checked) {
-        border-color: var(--cap-accent);
-        background: var(--cap-accent-soft);
+        border-color: var(--ui-accent);
+        background: var(--ui-accent-soft);
       }
       body.cap-page .cap-checks input[type="checkbox"] {
         margin: 0;
-        accent-color: var(--cap-accent);
+        accent-color: var(--ui-accent);
       }
       body.cap-page .cap-checks summary {
         width: fit-content;
-        font-size: 13px;
-        color: var(--cap-muted);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-muted);
         cursor: pointer;
       }
       body.cap-page .cap-checks details[open] summary {
@@ -937,7 +906,7 @@
         max-width: 640px;
       }
       body.cap-page .cap-key label {
-        font-size: 13.5px;
+        font-size: var(--ui-fz-s);
         font-weight: 600;
       }
       body.cap-page .cap-key-row {
@@ -952,8 +921,8 @@
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        font-size: 12.5px;
-        color: var(--cap-muted);
+        font-size: var(--ui-fz-s);
+        color: var(--ui-muted);
       }
       body.cap-page .cap-key-state::before {
         content: "";
@@ -961,7 +930,7 @@
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: var(--cap-faint);
+        background: var(--ui-faint);
       }
       body.cap-page .cap-key-actions {
         display: grid;
