@@ -1,6 +1,6 @@
 // HTTP静的配信とWSアップグレード、各部品の配線。
 // 実行: nr start
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage } from "node:http";
 import path from "node:path";
@@ -35,6 +35,8 @@ const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
 };
 
 let config: Config;
@@ -287,13 +289,17 @@ const server = createServer(async (req, res) => {
   }
 });
 
-// 起動時のpublic/の一覧だけを返す。リクエストのパスをファイルパスに連結しない
+// 起動時のpublic/とpublic/assets/の一覧だけを返す。リクエストのパスをファイルパスに連結しない
 function buildStaticRoutes(): Map<string, { file: string; type: string }> {
   const routes = new Map<string, { file: string; type: string }>();
-  for (const entry of readdirSync(PUBLIC_DIR, { withFileTypes: true })) {
-    const type = CONTENT_TYPES[path.extname(entry.name)];
-    if (!entry.isFile() || !type) continue;
-    routes.set(`/${entry.name}`, { file: path.join(PUBLIC_DIR, entry.name), type });
+  for (const dir of ["", "assets"]) {
+    const abs = path.join(PUBLIC_DIR, dir);
+    if (!existsSync(abs)) continue;
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      const type = CONTENT_TYPES[path.extname(entry.name)];
+      if (!entry.isFile() || !type) continue;
+      routes.set(path.posix.join("/", dir, entry.name), { file: path.join(abs, entry.name), type });
+    }
   }
   const capture = routes.get("/capture.html");
   if (capture) routes.set("/", capture);

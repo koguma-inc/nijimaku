@@ -104,23 +104,47 @@
       .help-note {
         color: var(--help-muted);
       }
+      .help-shot {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        margin: 12px 0 16px;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>Nijimaku 使い方</h1>
-      <p class="help-lead">このページは閉じてよい。Nijimakuの画面（capture.html）のタブは、配信中ずっと開いておく。<a href="./">Nijimakuの画面へ</a></p>
+      <p class="help-lead">Nijimakuの画面（capture.html）の操作と、OBS・PiPに字幕を出す手順。Nijimakuの画面のタブは、配信中ずっと開いておく。<a href="./">Nijimakuの画面へ</a></p>
 
       <nav class="help-box" aria-labelledby="toc">
         <h2 id="toc">目次</h2>
         <ol>
+          <li><a href="#key">APIキーを設定する</a></li>
           <li><a href="#mic">マイクの音声を送る</a></li>
           <li><a href="#obs">OBSに字幕を出す</a></li>
           <li><a href="#pip">PiPで字幕を見る</a></li>
+          <li><a href="#settings">設定を変える</a></li>
           <li><a href="#update">新しい版に更新する</a></li>
           <li><a href="#trouble">うまくいかないとき</a></li>
         </ol>
       </nav>
+
+      <section>
+        <h2 id="key">APIキーを設定する</h2>
+        <p>はじめて使うときに1回だけ行う。APIキーを設定するまで、「開始」は押せない。</p>
+        <ol>
+          <li>
+            Nijimakuの画面の「はじめにOpenAIのAPIキーを設定してください。」の横の「APIキーを設定」を押す。
+            <img class="help-shot" src="assets/key-setup.png" width="1600" height="337" alt="「はじめにOpenAIのAPIキーを設定してください。」と、その横の「APIキーを設定」ボタン" />
+          </li>
+          <li>
+            「OpenAI APIキー」にキーを入れて「保存」を押す。表示が「設定済み・接続済み」になれば使える。
+            <img class="help-shot" src="assets/settings-key.png" width="1600" height="369" alt="設定のAPIキーのタブ。「OpenAI APIキー」の入力欄と「保存」ボタン" loading="lazy" />
+          </li>
+        </ol>
+        <p>キーはNijimakuを動かしているPCに保存され、画面には表示されない。変更・削除は「設定」の「APIキー」で行う。</p>
+      </section>
 
       <section>
         <h2 id="mic">マイクの音声を送る</h2>
@@ -135,14 +159,17 @@
       <section>
         <h2 id="obs">OBSに字幕を出す</h2>
         <ol>
-          <li>先にNijimakuを起動しておく（OBSの字幕のページもNijimakuから読み込む）。</li>
-          <li>OBSのソースの「＋」から「ブラウザ」を追加し、URLにNijimakuの画面の「OBS用URL」を入れる（「コピー」でコピーできる）。「幅」と「高さ」は既定の800×600から配信のキャンバスの大きさ（例: 1920と1080）に変える。字幕は画面の下寄りに出る。</li>
+          <li>
+            OBSのソースの「＋」から「ブラウザ」を追加し、URLにNijimakuの画面の「OBS用URL」を入れる（「コピー」でコピーできる）。「幅」と「高さ」は既定の800×600から配信の解像度（例: 1920×1080）に変える。字幕は画面の下寄りに出る。
+            <img class="help-shot" src="assets/obs-url.png" width="1600" height="201" alt="「OBS用URL」の欄と「コピー」ボタン、「手元モニター」の「PiPで開く」ボタン" loading="lazy" />
+          </li>
           <li>「カスタムCSS」は既定のままにする（既定のCSSで背景が透過する）。</li>
         </ol>
         <ul>
-          <li>OBSでページを再読み込み（プロパティの「現在のページのキャッシュを更新」）しても、表示中の字幕がそのまま出る。</li>
+          <li>OBSは字幕のページをNijimakuから読み込むので、OBSより先にNijimakuを起動しておく。</li>
+          <li>OBSでページを読み直しても（プロパティの「現在のページのキャッシュを更新」）、表示中の字幕はそのまま出る。</li>
           <li>Nijimakuを再起動しても、OBSの字幕は自動で再接続する（OBS側の操作は要らない）。再起動すると表示中の字幕は消える。</li>
-          <li>文字の大きさ・色・位置は、Nijimakuの画面の「設定」の「表示」で変えられ、OBSにすぐ反映される。PiPでは、文字の大きさ・縁取りの太さ・間隔がOBSの2/3になり、「下からの位置」は反映されない（下端に寄せて出る）。</li>
+          <li>文字の大きさ・色・位置は、Nijimakuの画面の「設定」の「表示」で変えられ、OBSにすぐ反映される（<a href="#settings">設定を変える</a>）。</li>
         </ul>
       </section>
 
@@ -151,19 +178,42 @@
         <p>「手元モニター」の「PiPで開く」を押すと、字幕だけの小さなウィンドウが開き、常に他のウィンドウの手前に表示される（Chromeのみ）。配信画面とは別に、手元で字幕を確かめたいときに使う。</p>
         <ul>
           <li>ウィンドウは透過せず、位置はドラッグで動かす。</li>
+          <li>文字の大きさ・縁取りの太さ・間隔はOBSの2/3になり、「下からの位置」は反映されない（下端に寄せて出る）。</li>
           <li>Nijimakuの画面のタブを閉じるか読み直すと、PiPも閉じる。</li>
         </ul>
+      </section>
+
+      <section>
+        <h2 id="settings">設定を変える</h2>
+        <p>Nijimakuの画面の「設定」で変える。変えた値はすぐ反映され、Nijimakuを再起動しても残る。項目ごとの「リセット」で既定の値に戻る。</p>
+        <ul>
+          <li>「表示」: 字幕の文字の大きさ・色・縁取り・位置・フォントや、表示する文の数。プレビューで、1920×1080のOBSの画面に出したときの見え方を確かめられる。</li>
+          <li>「入力」: 発話とみなす音量や、文を区切る無音の長さ。ノイズ抑制・自動ゲイン調整・エコー除去の切り替え。</li>
+          <li>「文字起こし」: 配信の説明・用語集・話す言語・認識の待ち時間。</li>
+          <li>「APIキー」: APIキーの変更・削除。</li>
+        </ul>
+        <img class="help-shot" src="assets/settings-display.png" width="1600" height="1306" alt="設定の表示のタブ。左に字幕のプレビュー、右に文字の大きさや色などの項目" loading="lazy" />
+
+        <h3>用語集と配信の説明</h3>
+        <p>人名や作品名など、正しく文字起こししてほしい語や、英訳の表記を決めたい語は「用語集」に入れる。</p>
+        <ul>
+          <li>1語ごとに日本語と英語の欄に入れる（例: 「紫薇令あもる」と「Shibirei Amoru」）。末尾の空欄に書くと追加される。</li>
+          <li>日本語は文字起こしの手がかりに使い、英語を入れた語は英訳をその表記に揃える。英語は空でもよい。</li>
+          <li>「配信の説明」には配信の内容を書く（既定は「YouTubeのライブ配信。配信者一人が日本語で話しています。」）。文字起こしと英訳のAIに、配信の前提として渡す。</li>
+        </ul>
+        <img class="help-shot" src="assets/settings-transcription.png" width="1600" height="868" alt="設定の文字起こしのタブ。用語集に「紫薇令あもる」と「Shibirei Amoru」、「スパチャ」と「Super Chat」を入れた例" loading="lazy" />
       </section>
 
       <section>
         <h2 id="update">新しい版に更新する</h2>
         <p>Nijimakuは起動するたびに1回、GitHubのReleasesで新しい版を確かめる（Windowsの配布版だけ）。確かめられなかったときは「新しい版を確認できませんでした」と出るが、字幕はそのまま使える。</p>
         <p>新しい版があると、ヘッダーの下に「新しい版 v0.3.0 があります（今は v0.2.0）」のように出る。「変更点」を押すと、その版のGitHubのReleaseのページが開く。今の版はヘッダーに出る。</p>
+        <img class="help-shot" src="assets/update-notice.png" width="1600" height="207" alt="ヘッダーの下に出た「新しい版 v0.3.0 があります（今は v0.2.0）」の通知と、「更新して再起動」「変更点」ボタン" loading="lazy" />
 
         <h3>更新の手順</h3>
         <ol>
-          <li>「更新して再起動」を押す。再起動の間（数秒）字幕が止まるので、配信中に押すときは注意する。</li>
-          <li>「ダウンロードしています…」→「再起動しています…」と出る。新しい版をダウンロードしてSHA256で照合し、自動で再起動する。ファイルのコピーなどの手作業は要らない。必要ならNode.jsも新しくする。</li>
+          <li>「更新して再起動」を押す。再起動の後に「開始」を押し直すまで字幕が止まるので、配信中に押すときは注意する。</li>
+          <li>「ダウンロードしています…」→「再起動しています…」と出る。新しい版をダウンロードし、壊れていないか確かめてから自動で再起動する。ファイルのコピーなどの手作業は要らない。必要なら、Node.jsも自動で新しくする。</li>
           <li>再起動の後、Nijimakuの画面は自動で読み直す。マイクの「開始」を押し直す。</li>
           <li>PiPを使っていたら、「PiPで開く」で開き直す（Nijimakuの画面を読み直すとPiPのウィンドウは閉じる。ChromeのDocument Picture-in-Pictureの仕様）。</li>
         </ol>
@@ -176,33 +226,27 @@
         <ul>
           <li>「更新できませんでした: &lt;理由&gt;」と出たとき: 今の版はそのまま使える。「更新して再起動」をもう一度押すと、やり直せる。</li>
           <li>「v0.3.0 の起動に失敗したため、v0.2.0 に戻しました」のように出たとき: 新しい版が起動に失敗したので、自動で前の版に戻して起動し直している。前の版のまま使える。</li>
-          <li>「…には新しい起動役が要ります。Releaseのページから全部入りZIPをダウンロードし、今のフォルダに上書き展開してください」と出たとき: <a href="https://github.com/koguma-inc/nijimaku#windowsの配布版zip">READMEの「Windowsの配布版（ZIP）」</a>の「更新」の手順に従う。</li>
+          <li>「…には新しい起動役が要ります。Releaseのページから全部入りZIPをダウンロードし、今のフォルダに上書き展開してください」と出たとき: <a href="https://github.com/koguma-inc/nijimaku#windowsの配布版zip">READMEの「Windowsの配布版（ZIP）」</a>の「更新」の手順で、全部入りZIP（<code>nijimaku-&lt;版&gt;-win-x64.zip</code>）を上書き展開する。</li>
         </ul>
         <p>前の版に戻すボタンは無い。戻したいときは、READMEの同じ手順で前の版の全部入りZIPを上書き展開する。</p>
       </section>
 
       <section>
         <h2 id="trouble">うまくいかないとき</h2>
-        <p class="help-note">起動する前の問題（Nijimakuの画面が開かない等）は、<a href="https://github.com/koguma-inc/nijimaku#windowsの配布版zip">READMEの「Windowsの配布版（ZIP）」</a>の「うまくいかないとき」を見る。</p>
+        <p class="help-note">起動するときの問題（Nijimakuの画面が開かない等）は、<a href="https://github.com/koguma-inc/nijimaku#windowsの配布版zip">READMEの「Windowsの配布版（ZIP）」</a>の「うまくいかないとき」を見る。</p>
 
         <h3>「開始」を押せない</h3>
-        <p>APIキーが未設定。「はじめにOpenAIのAPIキーを設定してください。」の横の「APIキーを設定」を押すか、「設定」の「APIキー」で「OpenAI APIキー」に入力して「保存」を押す。</p>
+        <p>APIキーが未設定。<a href="#key">APIキーを設定する</a>の手順で設定する。</p>
 
         <h3>字幕が出ない</h3>
         <ul>
           <li>「サーバー」が「接続済み」、「文字起こし」が「準備完了」になっているか確かめる。「接続できません」のときは、その下に理由が出る。</li>
-          <li>話しても音量がメーターの白い線（発話とみなす音量）を越えないと、字幕は出ない。「マイク」で選んだマイクが合っているか確かめる。白い線は「設定」の「入力」の「発話とみなす音量」で変えられる。</li>
+          <li>
+            話しても音量がメーターの白い線（発話とみなす音量）を越えないと、字幕は出ない。「マイク」で選んだマイクが合っているか確かめる。白い線は「設定」の「入力」の「発話とみなす音量」で変えられる。
+            <img class="help-shot" src="assets/settings-input.png" width="1600" height="821" alt="設定の入力のタブ。「発話とみなす音量」などの項目と、ノイズ抑制・自動ゲイン調整・エコー除去の切り替え" loading="lazy" />
+          </li>
           <li>「マイクが切断されました。」と出たら、マイクをつなぎ直して「開始」を押す。</li>
         </ul>
-
-        <h3>「別のタブやPCのページで開始されたため、このページからの送信を止めました。」と出た</h3>
-        <p>別のタブや別のPCのNijimakuの画面で「開始」を押すと、音声の入力がそちらに切り替わり、元のタブは止まる（「サーバー」が「切断（別のページで開始）」になる）。自動では戻らないので、戻すときは元のタブでもう一度「開始」を押す。</p>
-
-        <h3>マイクの加工の切り替えが反映されない</h3>
-        <p>「ノイズ抑制・自動ゲイン調整・エコー除去の切り替えは、停止→開始で反映されます。」と出たら、「停止」を押してから「開始」を押す。</p>
-
-        <h3>「PiPで開く」を押せない</h3>
-        <p>「このブラウザはDocument Picture-in-Pictureに対応していません。Chromeで開いてください。」と出ている。Nijimakuの画面をChromeで開く。</p>
 
         <h3>更新に失敗した</h3>
         <p><a href="#update">新しい版に更新する</a>の「更新がうまくいかないとき」を見る。</p>

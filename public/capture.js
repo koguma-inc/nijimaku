@@ -434,7 +434,7 @@ function renderUpdate() {
     s.state === "restarting" ? "再起動しています…" :
     `新しい版 v${s.version} があります（今は ${current}）`;
   updateNote.textContent = busy ? AFTER_RESTART : appInfo?.canApply
-    ? `更新すると、再起動の間（数秒）字幕が止まります。${AFTER_RESTART}`
+    ? `更新すると字幕が止まります。${AFTER_RESTART}`
     : "更新は、Nijimakuを動かしているPCで開いたページから実行できます。";
   updateMessage.textContent = updateError || (s.state === "error" ? s.message : "");
   updateMessage.classList.toggle("is-error", updateMessage.textContent !== "");

@@ -5,13 +5,14 @@
 // 実行: nr dist
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { bsdtarPath } from "../src/bsdtar.ts";
 import { fetchNode } from "./fetch-node.ts";
 
-// サーバーがpublic/から配信する拡張子
-const PUBLIC_EXTS = new Set([".html", ".js", ".css"]);
+// サーバーが配信するフォルダと拡張子（src/server.tsのbuildStaticRoutesとCONTENT_TYPES）
+const PUBLIC_DIRS = ["public", "public/assets"];
+const PUBLIC_EXTS = new Set([".html", ".js", ".css", ".png", ".jpg"]);
 const RUNTIME_DEPS = ["openai", "ws"];
 // app/直下に置き、版のフォルダには入れないもの
 const LAUNCHER_FILES = ["launcher.ts", "launch-state.ts"];
@@ -71,7 +72,7 @@ async function main(): Promise<void> {
   write("app/current.json", json({ app: pkg.version }));
 
   const srcFiles = listFiles(root, "src", (file) => file.endsWith(".ts") && !file.endsWith(".test.ts") && !LAUNCHER_FILES.includes(file));
-  const publicFiles = listFiles(root, "public", (file) => PUBLIC_EXTS.has(path.extname(file)));
+  const publicFiles = PUBLIC_DIRS.filter((dir) => existsSync(path.join(root, dir))).flatMap((dir) => listFiles(root, dir, (file) => PUBLIC_EXTS.has(path.extname(file))));
   for (const file of [...srcFiles, ...publicFiles]) copy(path.join(root, file), `${versionDir}/${file}`);
   // pnpmのnode_modulesはシンボリックリンクなので、実体をコピーする。どちらも実行時の依存を持たない
   for (const dep of RUNTIME_DEPS) {
