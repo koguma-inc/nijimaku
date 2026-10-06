@@ -340,7 +340,7 @@ async function openPip() {
     return;
   }
   const pipDoc = pipWin.document;
-  pipDoc.title = "nijimaku 字幕";
+  pipDoc.title = "Nijimaku 字幕";
   pipDoc.documentElement.lang = "ja";
   copyStyleSheets(pipDoc);
   pipDoc.body.classList.add("is-pip");
