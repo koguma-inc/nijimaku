@@ -52,6 +52,7 @@ export type StreamContext = { description: string; glossary: GlossaryEntry[] };
 
 type Call = LunaMode;
 type CallError = { reason: string; message: string };
+type CallResult = { output: string; error?: CallError };
 
 export class Corrector {
   #client: OpenAI | null = null;
@@ -94,7 +95,7 @@ export class Corrector {
     this.#logger.log("luna.ja", { item_id: id, ja: raw, source: "raw" });
     this.#onFixed(id, raw);
     let en: string | undefined;
-    const error = await this.#stream(id, "translate", TRANSLATE_PROMPT, raw, context, (objects) => {
+    const result = await this.#stream(id, "translate", TRANSLATE_PROMPT, raw, context, (objects) => {
       for (const obj of objects) {
         if (en !== undefined || typeof obj.en !== "string") continue;
         en = obj.en;
@@ -103,7 +104,7 @@ export class Corrector {
       }
     });
     if (en === undefined) {
-      this.#logError(id, "translate", error ?? { reason: "no_en", message: "enの行がありません" });
+      this.#logError(id, "translate", result.error ?? { reason: "no_en", message: "enの行がありません" }, result.output);
     }
   }
 
@@ -118,7 +119,7 @@ export class Corrector {
       this.#logger.log("luna.en", { item_id: id, en });
       this.#onFixed(id, ja!, en);
     };
-    const error = await this.#stream(id, "combined", COMBINED_PROMPT, raw, context, (objects) => {
+    const result = await this.#stream(id, "combined", COMBINED_PROMPT, raw, context, (objects) => {
       for (const obj of objects) {
         // 空のjaを採用するとraw字幕ごと表示から消えるため、未取得として扱う
         if (ja === undefined && typeof obj.ja === "string" && obj.ja.trim() !== "") {
@@ -137,15 +138,15 @@ export class Corrector {
     // 失敗してもfinalの文を表示から消さないよう、rawで確定させる（英訳は出さない）
     if (ja === undefined) {
       this.#onFixed(id, raw);
-      this.#logError(id, "combined", error ?? { reason: "no_ja", message: "空でないjaの行がありません" });
+      this.#logError(id, "combined", result.error ?? { reason: "no_ja", message: "空でないjaの行がありません" }, result.output);
       return;
     }
     if (en === undefined) {
-      this.#logError(id, "combined", error ?? { reason: "no_en", message: "enの行がありません" });
+      this.#logError(id, "combined", result.error ?? { reason: "no_en", message: "enの行がありません" }, result.output);
     }
   }
 
-  // 失敗はthrowせず戻り値で返す。取得済みのオブジェクトはonObjectsへ渡し終えている
+  // 応答本文は失敗時のログ用に返す。取得済みのオブジェクトはonObjectsへ渡し終えている
   async #stream(
     id: string,
     call: Call,
@@ -153,14 +154,15 @@ export class Corrector {
     raw: string,
     context: string[],
     onObjects: (objects: Record<string, unknown>[]) => void,
-  ): Promise<CallError | undefined> {
+  ): Promise<CallResult> {
     const client = this.#client;
-    if (!client) return { reason: "unconfigured", message: "APIキーが未設定です" };
+    if (!client) return { output: "", error: { reason: "unconfigured", message: "APIキーが未設定です" } };
     const apiKey = this.#apiKey;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     const parser = new JsonLineParser();
     let firstToken = false;
+    let output = "";
     let error: CallError | undefined;
 
     this.#logger.log("luna.start", { item_id: id, call, raw, context });
@@ -179,6 +181,7 @@ export class Corrector {
       );
       for await (const event of stream) {
         if (event.type === "response.output_text.delta") {
+          output += event.delta;
           if (!firstToken) {
             firstToken = true;
             this.#logger.log("luna.first_token", { item_id: id, call });
@@ -211,11 +214,11 @@ export class Corrector {
       clearTimeout(timer);
     }
     if (error) error.message = error.message.replaceAll(apiKey, "[APIキー]");
-    return error;
+    return { output: output.replaceAll(apiKey, "[APIキー]"), error };
   }
 
-  #logError(id: string, call: Call, error: CallError): void {
-    this.#logger.log("luna.error", { item_id: id, call, ...error });
+  #logError(id: string, call: Call, error: CallError, output: string): void {
+    this.#logger.log("luna.error", { item_id: id, call, ...error, output });
   }
 }
 
