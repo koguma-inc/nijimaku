@@ -26,6 +26,8 @@
   --nm-side: 48px;
   --nm-max-width: 1200px;
   --nm-pip-bg: #101014;
+  /* 大きさ・太さ・間隔にかける倍率。PiPで縮めるのに使う（位置は倍率をかけずPiP用の値にする） */
+  --nm-scale: 1;
 }
 
 .nm-subs {
@@ -36,7 +38,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--nm-segment-gap);
+  gap: calc(var(--nm-segment-gap) * var(--nm-scale));
   padding: 0 var(--nm-side);
   pointer-events: none;
   font-family: var(--nm-font-family);
@@ -49,7 +51,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  max-width: var(--nm-max-width);
+  max-width: calc(var(--nm-max-width) * var(--nm-scale));
 }
 
 /* 縁取りは輪郭線を字の下に描く（paint-orderがHTMLの文字に効くのはChrome 123以降。OBS 32.xは127）。
@@ -57,20 +59,20 @@
 .nm-line {
   text-wrap: balance;
   overflow-wrap: anywhere;
-  -webkit-text-stroke: calc(var(--nm-stroke-width) * 2) var(--nm-stroke-color);
+  -webkit-text-stroke: calc(var(--nm-stroke-width) * 2 * var(--nm-scale)) var(--nm-stroke-color);
   paint-order: stroke fill;
-  text-shadow: 0 0 var(--nm-shadow-blur) var(--nm-stroke-color);
+  text-shadow: 0 0 calc(var(--nm-shadow-blur) * var(--nm-scale)) var(--nm-stroke-color);
 }
 
 .nm-ja {
-  font-size: var(--nm-ja-size);
+  font-size: calc(var(--nm-ja-size) * var(--nm-scale));
   color: var(--nm-ja-color);
 }
 
 /* flexのgapは負の値を取れないため、間隔はmarginで付ける */
 .nm-en {
-  margin-top: var(--nm-en-gap);
-  font-size: var(--nm-en-size);
+  margin-top: calc(var(--nm-en-gap) * var(--nm-scale));
+  font-size: calc(var(--nm-en-size) * var(--nm-scale));
   letter-spacing: var(--nm-en-letter-spacing);
   color: var(--nm-en-color);
 }
@@ -84,13 +86,9 @@
   opacity: var(--nm-partial-opacity);
 }
 
-/* PiPウィンドウ。OBSと違い透過できないため不透明な背景を敷き、文字を小さくする */
+/* PiPウィンドウ。OBSと違い透過できないため不透明な背景を敷き、設定の大きさを2/3に縮める */
 body.is-pip {
-  --nm-ja-size: 24px;
-  --nm-en-size: 17px;
-  --nm-stroke-width: 2px;
-  --nm-shadow-blur: 4px;
-  --nm-segment-gap: 8px;
+  --nm-scale: 0.667;
   --nm-bottom: 16px;
   --nm-side: 16px;
   margin: 0;

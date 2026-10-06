@@ -5,14 +5,16 @@ import { mountPreview } from "./subs-preview.js";
 const BACKOFF_MIN_MS = 1000;
 const BACKOFF_MAX_MS = 30000;
 const METER_FLOOR_DB = -60;
-const RT_STATE_LABELS = {
-  unconfigured: "APIキー未設定",
-  connecting: "接続中",
-  ready: "準備完了",
-  rotating: "ローテーション中",
-  reconnecting: "再接続中",
-  failed: "失敗",
+const RT_STATES = {
+  unconfigured: { label: "APIキー未設定", tone: "error" },
+  connecting: { label: "接続中", tone: "warn" },
+  ready: { label: "準備完了", tone: "ok" },
+  rotating: { label: "ローテーション中", tone: "ok" },
+  reconnecting: { label: "再接続中", tone: "warn" },
+  failed: { label: "失敗", tone: "error" },
 };
+const LIVE_LABELS = { off: "停止中", wait: "準備中", on: "LIVE" };
+const TAB_STORAGE_KEY = "nijimaku.captureTab";
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const deviceSelect = /** @type {HTMLSelectElement} */ ($("cap-device"));
@@ -20,11 +22,17 @@ const startBtn = /** @type {HTMLButtonElement} */ ($("cap-start"));
 const stopBtn = /** @type {HTMLButtonElement} */ ($("cap-stop"));
 const pipBtn = /** @type {HTMLButtonElement} */ ($("cap-pip"));
 const pipNote = $("cap-pip-note");
+const meterEl = $("cap-meter");
 const meterBar = $("cap-meter-bar");
 const meterValue = $("cap-meter-value");
 const meterThreshold = $("cap-meter-threshold");
+const wsStatEl = $("cap-ws-stat");
 const wsStateEl = $("cap-ws-state");
+const rtStatEl = $("cap-rt-stat");
 const rtStateEl = $("cap-rt-state");
+const rtDetailEl = $("cap-rt-detail");
+const liveEl = $("cap-live");
+const setupEl = $("cap-setup");
 const messageEl = $("cap-message");
 
 /** @type {{stream: MediaStream, ctx: AudioContext, source: MediaStreamAudioSourceNode, node: AudioWorkletNode} | null} */
@@ -36,6 +44,8 @@ let ws = null;
 let retryTimer = 0;
 let backoff = BACKOFF_MIN_MS;
 let levelDb = -Infinity;
+let thresholdDb = NaN;
+let rtState = "-";
 let meterRaf = 0;
 // サーバーの設定（/ws/captureのcapture.config、localhostなら設定パネルからも届く）
 let mic = { noiseSuppression: true, autoGainControl: true, echoCancellation: true };
@@ -50,20 +60,35 @@ function setMessage(text, isError = false) {
   messageEl.classList.toggle("is-error", isError);
 }
 
-function setWsState(text) {
+/** @param {"idle" | "warn" | "ok" | "error"} tone */
+function setWsState(text, tone = "idle") {
   wsStateEl.textContent = text;
+  wsStatEl.dataset.tone = tone;
 }
 
 function setRtState(state, detail = "") {
-  const label = RT_STATE_LABELS[state] ? `${RT_STATE_LABELS[state]}（${state}）` : state;
-  rtStateEl.textContent = detail ? `${label}: ${detail}` : label;
-  rtStateEl.classList.toggle("is-failed", state === "failed");
+  rtState = state;
+  const info = RT_STATES[state];
+  rtStateEl.textContent = info?.label ?? state;
+  rtDetailEl.textContent = detail;
+  rtStatEl.dataset.tone = info?.tone ?? "idle";
+  updateLive();
+}
+
+// 右上の表示。音声を送っていて、文字起こしの準備ができていればLIVE
+function updateLive() {
+  const state = audio === null ? "off" : rtState === "ready" || rtState === "rotating" ? "on" : "wait";
+  document.body.dataset.live = state;
+  liveEl.textContent = LIVE_LABELS[state];
 }
 
 function updateButtons() {
   startBtn.disabled = apiKeyConfigured === false || audio !== null || starting || !navigator.mediaDevices;
-  stopBtn.disabled = audio === null;
+  startBtn.setAttribute("aria-busy", String(starting));
+  startBtn.hidden = audio !== null;
+  stopBtn.disabled = stopBtn.hidden = audio === null;
   deviceSelect.disabled = audio !== null || starting;
+  updateLive();
 }
 
 async function refreshDevices() {
@@ -94,10 +119,12 @@ function drawMeter() {
   const ratio = Math.max(0, Math.min(1, (levelDb - METER_FLOOR_DB) / -METER_FLOOR_DB));
   meterBar.style.width = `${(ratio * 100).toFixed(1)}%`;
   meterValue.textContent = Number.isFinite(levelDb) ? `${levelDb.toFixed(1)} dBFS` : "-∞ dBFS";
+  meterEl.classList.toggle("is-over", levelDb >= thresholdDb);
 }
 
-function drawThreshold(thresholdDb) {
-  const ratio = (thresholdDb - METER_FLOOR_DB) / -METER_FLOOR_DB;
+function drawThreshold(db) {
+  thresholdDb = db;
+  const ratio = (db - METER_FLOOR_DB) / -METER_FLOOR_DB;
   meterThreshold.hidden = !Number.isFinite(ratio);
   meterThreshold.style.left = `${(Math.max(0, Math.min(1, ratio)) * 100).toFixed(1)}%`;
 }
@@ -144,6 +171,7 @@ function stopMeter() {
   levelDb = -Infinity;
   meterBar.style.width = "0";
   meterValue.textContent = "-";
+  meterEl.classList.remove("is-over");
 }
 
 function onTrackEnded() {
@@ -234,13 +262,13 @@ function connect() {
   const socket = new WebSocket(`${proto}//${location.host}/ws/capture`);
   socket.binaryType = "arraybuffer";
   ws = socket;
-  setWsState("接続中…");
+  setWsState("接続中…", "warn");
   updateButtons();
 
   socket.onopen = () => {
     if (ws !== socket) return;
     backoff = BACKOFF_MIN_MS;
-    setWsState("接続済み");
+    setWsState("接続済み", "ok");
     updateButtons();
   };
 
@@ -266,14 +294,14 @@ function connect() {
     if (ev.code === 4001) {
       // 置き換えられた側が再接続すると入力を奪い合うため、開始が押されるまで繋がない
       stopAudio();
-      setWsState("切断（置き換え）");
+      setWsState("切断（置き換え）", "error");
       setMessage("別の入力に切り替わりました", true);
       updateButtons();
       return;
     }
     const delay = backoff;
     backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
-    setWsState(`切断（code ${ev.code}）: ${delay / 1000}秒後に再接続`);
+    setWsState(`切断（code ${ev.code}）: ${delay / 1000}秒後に再接続`, "warn");
     retryTimer = setTimeout(connect, delay);
     updateButtons();
   };
@@ -324,10 +352,15 @@ async function openPip() {
 
 // --- 初期化 ---
 
-startBtn.addEventListener("click", () => void start());
+// 押したボタンは隠れるので、フォーカスをもう一方へ移す
+startBtn.addEventListener("click", async () => {
+  await start();
+  if (audio) stopBtn.focus();
+});
 stopBtn.addEventListener("click", () => {
   stop();
   setMessage("");
+  startBtn.focus();
 });
 
 if ("documentPictureInPicture" in window) {
@@ -337,6 +370,84 @@ if ("documentPictureInPicture" in window) {
   pipNote.textContent = "このブラウザはDocument Picture-in-Pictureに対応していません。Chromeで開いてください。";
 }
 
+// --- OBSのURL ---
+
+const overlayUrlInput = /** @type {HTMLInputElement} */ ($("cap-overlay-url"));
+const copyUrlBtn = $("cap-copy-url");
+const overlayUrl = new URL("./overlay.html", location.href).href;
+let copyTimer = 0;
+overlayUrlInput.value = overlayUrl;
+overlayUrlInput.addEventListener("focus", () => overlayUrlInput.select());
+copyUrlBtn.addEventListener("click", async () => {
+  let text = "コピーしました";
+  try {
+    await navigator.clipboard.writeText(overlayUrl);
+  } catch {
+    // http://localhost以外のhttpではクリップボードを使えない
+    overlayUrlInput.focus();
+    text = "選択したURLをコピーしてください";
+  }
+  copyUrlBtn.textContent = text;
+  copyUrlBtn.classList.add("is-done");
+  clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => {
+    copyUrlBtn.textContent = "コピー";
+    copyUrlBtn.classList.remove("is-done");
+  }, 2000);
+});
+
+// --- 設定のタブ ---
+
+const tabs = /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".cap-tab")]);
+const keyTab = $("cap-tab-key");
+
+function showTab(name) {
+  const target = tabs.find((t) => t.dataset.tab === name) ?? tabs[0];
+  for (const tab of tabs) {
+    const selected = tab === target;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    $(/** @type {string} */ (tab.getAttribute("aria-controls"))).hidden = !selected;
+  }
+  try {
+    localStorage.setItem(TAB_STORAGE_KEY, target.dataset.tab ?? "");
+  } catch {
+    // 保存できなくても切り替えはできる
+  }
+  return target;
+}
+
+for (const tab of tabs) {
+  tab.addEventListener("click", () => showTab(tab.dataset.tab));
+  tab.addEventListener("keydown", (ev) => {
+    const i = tabs.indexOf(tab);
+    const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[ev.key];
+    if (next === undefined) return;
+    ev.preventDefault();
+    showTab(tabs[(next + tabs.length) % tabs.length].dataset.tab).focus();
+  });
+}
+
+let savedTab = null;
+try {
+  savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+} catch {
+  // 読めなければ最初のタブ
+}
+showTab(savedTab);
+
+$("cap-setup-key").addEventListener("click", () => {
+  showTab("key");
+  $("cap-settings").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("cap-api-key").focus({ preventScroll: true });
+});
+
+// 広い画面ではコンソールが上に留まるので、その下にプレビューを留める
+const consoleEl = $("cap-console");
+new ResizeObserver(() => {
+  document.body.style.setProperty("--cap-console-h", `${consoleEl.offsetHeight}px`);
+}).observe(consoleEl);
+
 const updatePreview = mountPreview($("cap-preview"));
 
 mountSettings({
@@ -344,6 +455,8 @@ mountSettings({
   note: $("cap-settings-note"),
   message: $("cap-settings-message"),
   onCredentials: (status) => {
+    setupEl.hidden = status.configured;
+    keyTab.classList.toggle("has-alert", !status.configured);
     applyCaptureConfig({ apiKeyConfigured: status.configured });
     if (!audio) setRtState(status.state, status.detail ?? "");
   },

@@ -7,253 +7,611 @@
     <!-- PiPへスタイルシートをコピーするため、字幕のCSSもここで読み込む -->
     <link rel="stylesheet" href="./overlay.css" />
     <style>
-      /* PiPにもコピーされるため、すべてbody.cap-page配下に限定する */
+      /* PiPにもコピーされるため、すべてbody.cap-page配下に限定する（変数も:rootに置かない） */
+      html:has(body.cap-page) {
+        color-scheme: dark;
+        background: #111113;
+      }
       body.cap-page {
+        --cap-bg: #111113;
+        --cap-surface: #18181b;
+        --cap-raised: #1f1f23;
+        --cap-hover: #2a2a30;
+        --cap-border: #303037;
+        --cap-border-strong: #43434c;
+        --cap-text: #ededef;
+        --cap-muted: #a1a1aa;
+        --cap-faint: #71717a;
+        --cap-note: #c4c4cc;
+        --cap-accent: #4c8ff8;
+        --cap-accent-hover: #67a2fa;
+        --cap-accent-soft: rgba(76, 143, 248, 0.15);
+        /* 枠線の下に繰り返した端がはみ出さないよう、枠線ごと1枚で塗る */
+        --cap-go: linear-gradient(120deg, #ff5fa2 0%, #b46bff 50%, #4fa9ff 100%) 0 0 / 180% 100% no-repeat border-box;
+        --cap-ok: #46a758;
+        --cap-warn: #f5b544;
+        --cap-error: #ef5f5f;
+        --cap-live: #e5484d;
+        --cap-console-h: 0px;
+
+        min-height: 100vh;
         margin: 0;
-        padding: 24px;
-        font-family: system-ui, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+        font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
         font-size: 14px;
         line-height: 1.6;
-        color: #1f2328;
-        background: #f6f7f9;
+        color: var(--cap-text);
+        background: var(--cap-bg);
+        -webkit-font-smoothing: antialiased;
       }
-      body.cap-page .cap-main {
-        max-width: 800px;
-        margin: 0 auto;
+      body.cap-page *,
+      body.cap-page *::before,
+      body.cap-page *::after {
+        box-sizing: border-box;
+      }
+      /* display指定のある要素でもhiddenで消す。リセットボタンだけは列の幅を保つため場所を残す */
+      body.cap-page [hidden]:not(.cap-field-reset) {
+        display: none !important;
+      }
+      body.cap-page .cap-field-reset[hidden] {
+        display: block;
+        visibility: hidden;
+      }
+      body.cap-page :is(h1, h2, h3, p, figure, dl, dd) {
+        margin: 0;
+      }
+      body.cap-page a {
+        color: var(--cap-text);
+      }
+      body.cap-page :is(button, a, summary, input[type="checkbox"], input[type="range"], input[type="color"]):focus-visible {
+        outline: 2px solid var(--cap-accent);
+        outline-offset: 2px;
+      }
+
+      /* --- 骨組み --- */
+      body.cap-page .cap-shell {
         display: grid;
         gap: 16px;
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 24px 24px 64px;
       }
-      body.cap-page h1 {
-        margin: 0;
-        font-size: 20px;
+      body.cap-page .cap-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 4px;
       }
-      body.cap-page .cap-card {
-        display: grid;
-        gap: 12px;
-        padding: 16px;
-        border: 1px solid #d0d7de;
-        border-radius: 8px;
-        background: #fff;
-      }
-      body.cap-page .cap-card[hidden] {
-        display: none;
-      }
-      body.cap-page .cap-row {
+      body.cap-page .cap-brand {
         display: flex;
         flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 12px;
+      }
+      body.cap-page h1 {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      body.cap-page .cap-tagline {
+        font-size: 13px;
+        color: var(--cap-muted);
+      }
+      body.cap-page .cap-live {
+        display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 7px;
+        height: 28px;
+        padding: 0 12px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--cap-muted);
+        white-space: nowrap;
       }
-      body.cap-page label {
+      body.cap-page .cap-live::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      body.cap-page[data-live="wait"] .cap-live {
+        border-color: rgba(245, 181, 68, 0.4);
+        color: var(--cap-warn);
+      }
+      body.cap-page[data-live="on"] .cap-live {
+        border-color: var(--cap-live);
+        background: var(--cap-live);
+        color: #fff;
+        letter-spacing: 0.06em;
+      }
+      body.cap-page[data-live="on"] .cap-live::before {
+        background: #fff;
+        animation: cap-blink 1.2s steps(1) infinite;
+      }
+
+      body.cap-page .cap-card {
+        display: grid;
+        gap: 16px;
+        padding: 20px;
+        border: 1px solid var(--cap-border);
+        border-radius: 12px;
+        background: var(--cap-surface);
+      }
+      body.cap-page h2 {
+        font-size: 14.5px;
+        font-weight: 700;
+        line-height: 1.4;
+      }
+      body.cap-page .cap-note {
+        font-size: 12.5px;
+        color: var(--cap-note);
+      }
+      body.cap-page .cap-note.is-warn {
+        color: var(--cap-warn);
+      }
+      body.cap-page .cap-message {
+        font-size: 13px;
+        color: var(--cap-muted);
+        white-space: pre-wrap;
+      }
+      body.cap-page .cap-message:empty {
+        display: none;
+      }
+      body.cap-page .cap-message.is-error {
+        padding: 9px 12px;
+        border: 1px solid rgba(239, 95, 95, 0.35);
+        border-radius: 8px;
+        background: rgba(239, 95, 95, 0.07);
         font-weight: 600;
+        color: var(--cap-error);
       }
-      body.cap-page select {
+
+      /* --- ボタン --- */
+      body.cap-page button {
+        font: inherit;
+        color: inherit;
+      }
+      body.cap-page .cap-btn {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 36px;
+        padding: 0 14px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 8px;
+        background: var(--cap-raised);
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--cap-text);
+        text-decoration: none;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s, color 0.12s;
+      }
+      body.cap-page .cap-btn:hover:not(:disabled) {
+        background: var(--cap-hover);
+      }
+      body.cap-page .cap-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      body.cap-page .cap-btn-primary {
+        border-color: transparent;
+        background: var(--cap-accent);
+        color: #fff;
+      }
+      body.cap-page .cap-btn-primary:hover:not(:disabled) {
+        background: var(--cap-accent-hover);
+      }
+      body.cap-page .cap-btn-danger {
+        border-color: rgba(239, 95, 95, 0.4);
+        background: transparent;
+        color: var(--cap-error);
+      }
+      body.cap-page .cap-btn-danger:hover:not(:disabled) {
+        background: rgba(239, 95, 95, 0.1);
+      }
+      body.cap-page .cap-btn.is-done,
+      body.cap-page .cap-btn.is-done:hover:not(:disabled) {
+        border-color: rgba(70, 167, 88, 0.55);
+        background: var(--cap-raised);
+        color: var(--cap-ok);
+      }
+
+      /* --- コンソール（開始・マイク・メーター・状態） --- */
+      body.cap-page .cap-console {
+        position: relative;
+        z-index: 10;
+        display: grid;
+        gap: 14px;
+        padding: 18px 20px;
+        border: 1px solid var(--cap-border);
+        border-radius: 12px;
+        background: var(--cap-surface);
+      }
+      body.cap-page .cap-console-main {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) minmax(190px, 250px);
+        align-items: center;
+        gap: 24px;
+      }
+      body.cap-page .cap-go,
+      body.cap-page .cap-halt {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-width: 132px;
+        height: 52px;
+        padding: 0 24px;
+        border: 1px solid transparent;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+      }
+      body.cap-page .cap-go svg,
+      body.cap-page .cap-halt svg {
+        width: 16px;
+        height: 16px;
+      }
+      /* 開始ボタンだけはグラデーションで目立たせる。マウスを乗せると色が右へ流れる */
+      body.cap-page .cap-go {
+        background: var(--cap-go);
+        color: #fff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        transition: background-position 0.4s, color 0.12s, border-color 0.12s;
+      }
+      body.cap-page .cap-go:hover:not(:disabled) {
+        background-position: 100% 0;
+      }
+      body.cap-page .cap-go:disabled {
+        border-color: var(--cap-border);
+        background: var(--cap-raised);
+        color: var(--cap-faint);
+        box-shadow: none;
+        cursor: not-allowed;
+      }
+      body.cap-page .cap-go[aria-busy="true"] {
+        border-color: transparent;
+        background: var(--cap-go);
+        color: #fff;
+        opacity: 0.6;
+        cursor: progress;
+      }
+      body.cap-page .cap-halt {
+        border-color: rgba(229, 72, 77, 0.5);
+        background: rgba(229, 72, 77, 0.1);
+        color: #ff7b7f;
+      }
+      body.cap-page .cap-halt:hover {
+        background: rgba(229, 72, 77, 0.18);
+      }
+
+      body.cap-page .cap-input {
+        display: grid;
+        gap: 14px;
+        min-width: 0;
+      }
+      body.cap-page .cap-device {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      body.cap-page .cap-device label {
+        flex: none;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--cap-muted);
+      }
+      body.cap-page .cap-device select {
         flex: 1;
         min-width: 0;
-        padding: 4px 6px;
-        font: inherit;
       }
-      body.cap-page button {
-        padding: 6px 14px;
-        font: inherit;
-        border: 1px solid #8c959f;
-        border-radius: 6px;
-        background: #fff;
-        cursor: pointer;
-      }
-      body.cap-page button:disabled {
-        opacity: 0.5;
-        cursor: default;
+      body.cap-page .cap-meter-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
       }
       body.cap-page .cap-meter {
         position: relative;
         flex: 1;
         height: 12px;
-        border-radius: 6px;
-        background: #e1e4e8;
+      }
+      /* 色の帯を敷き、音量より右をバーの右の枠線で暗くする。
+         色の境目は-20dBFSと-9dBFS（左端はcapture.jsのMETER_FLOOR_DBの-60dBFS） */
+      body.cap-page .cap-meter-track {
+        position: absolute;
+        inset: 0;
         overflow: hidden;
+        border-radius: 3px;
+        background: linear-gradient(90deg, var(--cap-ok) 0 66.7%, var(--cap-warn) 66.7% 85%, var(--cap-live) 85%);
+      }
+      body.cap-page .cap-meter-track::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(90deg, transparent 0 4px, var(--cap-surface) 4px 6px);
+        pointer-events: none;
       }
       body.cap-page .cap-meter-bar {
         position: absolute;
         inset: 0 auto 0 0;
+        box-sizing: content-box;
         width: 0;
-        background: #2da44e;
+        border-right: 100vmax solid rgba(31, 31, 35, 0.88);
       }
       body.cap-page .cap-meter-threshold {
         position: absolute;
-        top: 0;
-        bottom: 0;
+        top: -4px;
+        bottom: -4px;
         width: 2px;
         margin-left: -1px;
-        background: #cf222e;
-      }
-      body.cap-page .cap-meter-threshold[hidden] {
-        display: none;
+        border-radius: 1px;
+        background: var(--cap-text);
       }
       body.cap-page .cap-meter-value {
-        min-width: 7em;
-        text-align: right;
-        font-variant-numeric: tabular-nums;
-      }
-      body.cap-page dl {
-        display: grid;
-        grid-template-columns: max-content 1fr;
-        gap: 4px 12px;
-        margin: 0;
-      }
-      body.cap-page dt {
-        font-weight: 600;
-      }
-      body.cap-page dd {
-        margin: 0;
-      }
-      body.cap-page .cap-status.is-failed {
-        padding: 2px 8px;
-        border-radius: 4px;
-        color: #fff;
-        background: #cf222e;
-        font-weight: 700;
-      }
-      body.cap-page .cap-note {
-        color: #57606a;
-      }
-      body.cap-page .cap-message {
-        min-height: 1.6em;
-        margin: 0;
-        white-space: pre-wrap;
-      }
-      body.cap-page .cap-message.is-error {
-        color: #cf222e;
-        font-weight: 600;
-      }
-      body.cap-page h2 {
-        margin: 0;
-        font-size: 16px;
-      }
-      body.cap-page h3 {
-        margin: 0;
-        font-size: 14px;
-      }
-      body.cap-page .cap-fields {
-        display: grid;
-        grid-template-columns: minmax(9em, max-content) minmax(0, 1fr) auto;
-        align-items: start;
-        gap: 8px 12px;
-        margin-top: 8px;
-      }
-      body.cap-page .cap-field-label {
-        padding-top: 4px;
-        font-weight: 600;
-      }
-      body.cap-page .cap-field-control {
-        display: grid;
-        gap: 2px;
-        min-width: 0;
-      }
-      body.cap-page .cap-field-control input[type="number"],
-      body.cap-page .cap-field-control input[type="text"],
-      body.cap-page .cap-field-control input[type="password"],
-      body.cap-page .cap-field-control select,
-      body.cap-page .cap-field-control textarea {
-        box-sizing: border-box;
-        width: 100%;
-        padding: 4px 6px;
-        font: inherit;
-      }
-      body.cap-page select,
-      body.cap-page .cap-field-control input[type="number"],
-      body.cap-page .cap-field-control input[type="text"],
-      body.cap-page .cap-field-control input[type="password"],
-      body.cap-page .cap-field-control textarea {
-        border: 1px solid #8c959f;
-        border-radius: 4px;
-        background-color: #fff;
-      }
-      /* Chromeの標準の矢印は右端に寄るため、自前で描いて右に余白を取る */
-      body.cap-page select,
-      body.cap-page .cap-field-control select {
-        appearance: none;
-        padding-right: 28px;
-        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2357606a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
-      }
-      body.cap-page .cap-field-control input[type="number"],
-      body.cap-page .cap-field-control input.cap-color-text {
-        width: 8rem;
-      }
-      body.cap-page .cap-field-control input[type="checkbox"] {
-        justify-self: start;
-        margin: 6px 0;
-      }
-      body.cap-page .cap-field-control textarea {
-        resize: vertical;
-      }
-      body.cap-page .cap-field-hint {
-        color: #57606a;
+        min-width: 6.5em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        color: var(--cap-muted);
+        text-align: right;
       }
-      body.cap-page .cap-field-input {
-        display: flex;
+      body.cap-page .cap-meter.is-over + .cap-meter-value {
+        color: var(--cap-ok);
+      }
+
+      body.cap-page .cap-stats {
+        display: grid;
+        gap: 8px;
+      }
+      body.cap-page .cap-stat {
+        display: grid;
+        grid-template-columns: 7px minmax(0, 1fr);
         align-items: center;
-        gap: 6px;
+        column-gap: 10px;
+        padding: 7px 12px;
+        border: 1px solid var(--cap-border);
+        border-radius: 8px;
+        background: var(--cap-bg);
       }
-      body.cap-page .cap-color-picker {
-        flex: none;
-        width: 36px;
-        height: 28px;
-        padding: 0 2px;
-        border: 1px solid #8c959f;
-        border-radius: 4px;
-        background: #fff;
-        cursor: pointer;
+      body.cap-page .cap-stat::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--cap-faint);
       }
-      body.cap-page .cap-field-reset {
-        padding: 2px 8px;
+      body.cap-page .cap-stat dt {
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.4;
+        color: var(--cap-muted);
       }
-      body.cap-page .cap-field-reset[hidden] {
-        visibility: hidden;
+      body.cap-page .cap-stat dd {
+        grid-column: 2;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+      body.cap-page .cap-stat-detail {
         display: block;
+        font-size: 11.5px;
+        font-weight: 400;
+        color: var(--cap-muted);
       }
-      body.cap-page .cap-glossary {
-        display: grid;
-        gap: 4px;
+      body.cap-page .cap-stat-detail:empty {
+        display: none;
       }
-      body.cap-page .cap-glossary-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-        gap: 4px;
+      body.cap-page :is(.cap-stat, .cap-key-state)[data-tone="ok"]::before {
+        background: var(--cap-ok);
       }
-      body.cap-page .cap-glossary-row button {
-        padding: 2px 8px;
+      body.cap-page :is(.cap-stat, .cap-key-state)[data-tone="warn"]::before {
+        background: var(--cap-warn);
+        animation: cap-blink 1s steps(1) infinite;
       }
-      body.cap-page .cap-checks-list {
+      body.cap-page :is(.cap-stat, .cap-key-state)[data-tone="error"]::before {
+        background: var(--cap-error);
+      }
+      body.cap-page .cap-stat[data-tone="error"] dd {
+        color: var(--cap-error);
+      }
+
+      body.cap-page .cap-setup {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px 16px;
-        padding-top: 4px;
-      }
-      body.cap-page .cap-checks label {
-        display: inline-flex;
         align-items: center;
-        gap: 4px;
-        font-weight: normal;
+        justify-content: space-between;
+        gap: 10px 16px;
+        padding: 10px 12px 10px 14px;
+        border: 1px solid rgba(245, 181, 68, 0.35);
+        border-radius: 8px;
+        background: rgba(245, 181, 68, 0.06);
+        font-weight: 600;
       }
-      body.cap-page .cap-checks input[type="checkbox"] {
-        margin: 0;
+
+      /* --- OBSとPiP --- */
+      body.cap-page .cap-output {
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+        gap: 20px 40px;
       }
-      body.cap-page .cap-checks summary {
-        margin-top: 4px;
-        color: #57606a;
+      body.cap-page .cap-output-item {
+        position: relative;
+        display: grid;
+        align-content: start;
+        gap: 12px;
+        min-width: 0;
+      }
+      body.cap-page .cap-output-item + .cap-output-item::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -20px;
+        width: 1px;
+        background: var(--cap-border);
+      }
+      body.cap-page .cap-url {
+        display: flex;
+        gap: 8px;
+      }
+      body.cap-page .cap-url input {
+        flex: 1;
+        min-width: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+      }
+
+      /* --- 入力欄 --- */
+      /* :whereで優先度を下げ、下のtextarea・selectの高さと余白を上書きできるようにする */
+      body.cap-page :where(select, input[type="text"], input[type="password"], input[type="number"], textarea) {
+        height: 36px;
+        padding: 0 11px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 8px;
+        background-color: var(--cap-bg);
+        font: inherit;
+        font-size: 13.5px;
+        color: var(--cap-text);
+        transition: border-color 0.12s, box-shadow 0.12s;
+      }
+      body.cap-page textarea {
+        height: auto;
+        padding: 9px 11px;
+        line-height: 1.6;
+        resize: vertical;
+      }
+      body.cap-page :is(select, input[type="text"], input[type="password"], input[type="number"], textarea):hover:not(:disabled) {
+        border-color: #565660;
+      }
+      body.cap-page :is(select, input[type="text"], input[type="password"], input[type="number"], textarea):focus {
+        border-color: var(--cap-accent);
+        outline: none;
+        box-shadow: 0 0 0 3px var(--cap-accent-soft);
+      }
+      body.cap-page :is(select, input, textarea):disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      body.cap-page ::placeholder {
+        color: var(--cap-faint);
+      }
+      /* Chromeの標準の矢印は右端に寄るため、自前で描いて右に余白を取る */
+      body.cap-page select {
+        padding-right: 32px;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 11px center;
         cursor: pointer;
+      }
+
+      /* --- 設定 --- */
+      body.cap-page .cap-settings {
+        gap: 18px;
+      }
+      body.cap-page .cap-settings-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 4px 16px;
+      }
+      body.cap-page .cap-settings-head h2 {
+        font-size: 16px;
+      }
+      body.cap-page .cap-tabs {
+        display: flex;
+        gap: 2px;
+        width: fit-content;
+        max-width: 100%;
+        padding: 3px;
+        overflow-x: auto;
+        border: 1px solid var(--cap-border);
+        border-radius: 10px;
+        background: var(--cap-bg);
+      }
+      body.cap-page .cap-tab {
+        flex: none;
+        height: 32px;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--cap-muted);
+        white-space: nowrap;
+        cursor: pointer;
+        transition: color 0.12s, background 0.12s;
+      }
+      body.cap-page .cap-tab:hover {
+        color: var(--cap-text);
+      }
+      body.cap-page .cap-tab[aria-selected="true"] {
+        background: var(--cap-hover);
+        color: var(--cap-text);
+      }
+      body.cap-page .cap-tab.has-alert::after {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-left: 7px;
+        vertical-align: middle;
+        border-radius: 50%;
+        background: var(--cap-error);
+      }
+      body.cap-page .cap-panel {
+        display: grid;
+        gap: 18px;
+      }
+      body.cap-page .cap-panel > .cap-fields,
+      body.cap-page .cap-panel > .cap-note {
+        max-width: 860px;
+      }
+
+      body.cap-page .cap-display {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        align-items: start;
+        gap: 28px;
+      }
+      body.cap-page .cap-preview-wrap {
+        display: grid;
+        gap: 10px;
+      }
+      body.cap-page .cap-preview-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      body.cap-page .cap-chip {
+        padding: 1px 7px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--cap-muted);
       }
       body.cap-page .cap-preview {
         position: relative;
         aspect-ratio: 16 / 9;
-        margin-top: 8px;
         overflow: hidden;
-        border: 1px solid #d0d7de;
-        border-radius: 6px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 8px;
         /* OBSでは背景が透過するので、市松模様で見せる */
-        background: repeating-conic-gradient(#6e7781 0 25%, #8c959f 0 50%) 0 0 / 16px 16px;
+        background: repeating-conic-gradient(#1c1c20 0 25%, #242428 0 50%) 0 0 / 16px 16px;
       }
       body.cap-page .cap-preview-canvas {
         position: absolute;
@@ -263,95 +621,520 @@
         height: 1080px;
         transform-origin: 0 0;
       }
-      body.cap-page p.cap-field-hint {
-        margin: 4px 0 0;
+
+      body.cap-page .cap-fields {
+        display: grid;
+        grid-template-columns: minmax(8em, max-content) minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 26px 16px;
+      }
+      body.cap-page .cap-field-label {
+        padding-top: 7px;
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      body.cap-page .cap-field-control {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+      body.cap-page .cap-field-input {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        font-size: 12.5px;
+        color: var(--cap-muted);
+      }
+      body.cap-page .cap-field-control :is(select, textarea, input[type="text"], input[type="password"]) {
+        width: 100%;
+      }
+      body.cap-page .cap-field-control input[type="number"] {
+        flex: none;
+        width: 5rem;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+        appearance: textfield;
+      }
+      /* 横のスライダーで増減できるので、数値の欄の上下ボタンは出さない */
+      body.cap-page .cap-field-control input[type="number"]::-webkit-inner-spin-button,
+      body.cap-page .cap-field-control input[type="number"]::-webkit-outer-spin-button {
+        margin: 0;
+        appearance: none;
+      }
+      /* いちばん長い単位（dBFS）に合わせた幅 */
+      body.cap-page .cap-field-unit {
+        flex: none;
+        width: 2.8em;
+      }
+      body.cap-page .cap-field-control input.cap-color-text {
+        flex: 1;
+        max-width: 15rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+      }
+      body.cap-page .cap-field-hint {
+        font-size: 12.5px;
+        line-height: 1.55;
+        color: var(--cap-note);
+      }
+      body.cap-page .cap-field-reset {
+        height: 28px;
+        margin-top: 4px;
+        padding: 0 10px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 6px;
+        background: transparent;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--cap-muted);
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
+      }
+      body.cap-page .cap-field-reset:hover {
+        background: var(--cap-hover);
+        color: var(--cap-text);
+      }
+
+      body.cap-page input.cap-range {
+        --cap-fill: 0%;
+        flex: 1;
+        min-width: 60px;
+        height: 20px;
+        margin: 0;
+        background: transparent;
+        appearance: none;
+        cursor: pointer;
+      }
+      body.cap-page input.cap-range::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(var(--cap-accent), var(--cap-accent)) 0 0 / var(--cap-fill) 100% no-repeat, var(--cap-border-strong);
+      }
+      body.cap-page input.cap-range::-webkit-slider-thumb {
+        width: 14px;
+        height: 14px;
+        margin-top: -5px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--cap-text);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        appearance: none;
+      }
+      body.cap-page input.cap-range:hover::-webkit-slider-thumb,
+      body.cap-page input.cap-range:active::-webkit-slider-thumb {
+        background: #fff;
+      }
+      body.cap-page input.cap-range::-moz-range-track {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--cap-border-strong);
+      }
+      body.cap-page input.cap-range::-moz-range-progress {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--cap-accent);
+      }
+      body.cap-page input.cap-range::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--cap-text);
+      }
+
+      body.cap-page input.cap-switch {
+        position: relative;
+        flex: none;
+        width: 36px;
+        height: 20px;
+        margin: 0;
+        border-radius: 999px;
+        background: var(--cap-border-strong);
+        appearance: none;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      body.cap-page input.cap-switch::before {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: var(--cap-muted);
+        transition: transform 0.15s, background 0.15s;
+      }
+      body.cap-page input.cap-switch:checked {
+        background: var(--cap-accent);
+      }
+      body.cap-page input.cap-switch:checked::before {
+        background: #fff;
+        transform: translateX(16px);
+      }
+
+      body.cap-page .cap-color-picker {
+        flex: none;
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 8px;
+        background: transparent;
+        appearance: none;
+        cursor: pointer;
+      }
+      body.cap-page .cap-color-picker::-webkit-color-swatch-wrapper {
+        padding: 3px;
+      }
+      body.cap-page .cap-color-picker::-webkit-color-swatch {
+        border: 0;
+        border-radius: 5px;
+      }
+      body.cap-page .cap-color-picker::-moz-color-swatch {
+        border: 0;
+        border-radius: 5px;
+      }
+
+      body.cap-page .cap-glossary {
+        display: grid;
+        gap: 8px;
+      }
+      body.cap-page .cap-glossary-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 30px;
+        align-items: center;
+        gap: 8px;
+      }
+      body.cap-page .cap-glossary-arrow {
+        color: var(--cap-faint);
+      }
+      body.cap-page .cap-glossary-row button {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: transparent;
+        font-size: 17px;
+        line-height: 1;
+        color: var(--cap-muted);
+        cursor: pointer;
+      }
+      body.cap-page .cap-glossary-row button:hover {
+        background: rgba(239, 95, 95, 0.1);
+        color: var(--cap-error);
+      }
+      /* 末尾の空行は追加用で消せないので、削除ボタンを見せない */
+      body.cap-page .cap-glossary-row button:disabled {
+        visibility: hidden;
+      }
+
+      body.cap-page .cap-checks {
+        display: grid;
+        gap: 10px;
+      }
+      body.cap-page .cap-checks-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      body.cap-page .cap-checks label {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 32px;
+        padding: 0 12px 0 10px;
+        border: 1px solid var(--cap-border-strong);
+        border-radius: 6px;
+        background: var(--cap-bg);
+        font-size: 13px;
+        cursor: pointer;
+        transition: border-color 0.12s, background 0.12s;
+      }
+      body.cap-page .cap-checks label:hover {
+        border-color: #565660;
+      }
+      body.cap-page .cap-checks label:has(input:checked) {
+        border-color: var(--cap-accent);
+        background: var(--cap-accent-soft);
+      }
+      body.cap-page .cap-checks input[type="checkbox"] {
+        margin: 0;
+        accent-color: var(--cap-accent);
+      }
+      body.cap-page .cap-checks summary {
+        width: fit-content;
+        font-size: 13px;
+        color: var(--cap-muted);
+        cursor: pointer;
+      }
+      body.cap-page .cap-checks details[open] summary {
+        margin-bottom: 10px;
+      }
+
+      body.cap-page .cap-key {
+        display: grid;
+        gap: 10px;
+        max-width: 640px;
+      }
+      body.cap-page .cap-key label {
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      body.cap-page .cap-key-row {
+        display: flex;
+        gap: 8px;
+      }
+      body.cap-page .cap-key-row input {
+        flex: 1;
+        min-width: 0;
+      }
+      body.cap-page .cap-key-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12.5px;
+        color: var(--cap-muted);
+      }
+      body.cap-page .cap-key-state::before {
+        content: "";
+        flex: none;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--cap-faint);
+      }
+      body.cap-page .cap-key-actions {
+        display: grid;
+        justify-items: start;
+        gap: 12px;
+        max-width: 640px;
+      }
+
+      body.cap-page .cap-settings-off {
+        padding: 14px 18px;
+        border: 1px dashed var(--cap-border-strong);
+        border-radius: 12px;
+      }
+
+      @keyframes cap-blink {
+        50% {
+          opacity: 0.25;
+        }
+      }
+
+      /* 広い画面ではコンソールを上に留め、設定を触りながらメーターを見られるようにする */
+      @media (min-width: 960px) and (min-height: 720px) {
+        body.cap-page .cap-console {
+          position: sticky;
+          top: 12px;
+          box-shadow: 0 12px 24px -16px rgba(0, 0, 0, 0.8);
+        }
+        body.cap-page .cap-preview-wrap {
+          position: sticky;
+          top: calc(var(--cap-console-h) + 28px);
+        }
+        body.cap-page .cap-settings {
+          scroll-margin-top: calc(var(--cap-console-h) + 24px);
+        }
+      }
+      @media (max-width: 959px) {
+        body.cap-page .cap-console-main {
+          grid-template-columns: auto minmax(0, 1fr);
+        }
+        body.cap-page .cap-stats {
+          grid-column: 1 / -1;
+          grid-template-columns: 1fr 1fr;
+        }
+        body.cap-page .cap-output,
+        body.cap-page .cap-display {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        body.cap-page .cap-output-item + .cap-output-item::before {
+          top: -10px;
+          bottom: auto;
+          left: 0;
+          right: 0;
+          width: auto;
+          height: 1px;
+        }
+      }
+      @media (max-width: 640px) {
+        body.cap-page .cap-shell {
+          padding: 16px 16px 48px;
+        }
+        body.cap-page .cap-card,
+        body.cap-page .cap-console {
+          padding: 16px;
+        }
+        body.cap-page .cap-console-main,
+        body.cap-page .cap-stats {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        body.cap-page .cap-go,
+        body.cap-page .cap-halt {
+          width: 100%;
+        }
+        /* 項目名とリセットボタンを1行目、入力欄を2行目に置く */
+        body.cap-page .cap-fields {
+          grid-template-columns: minmax(0, 1fr) auto;
+          grid-auto-flow: dense;
+          gap: 6px 12px;
+        }
+        body.cap-page .cap-field-label {
+          grid-column: 1;
+          margin-top: 10px;
+        }
+        body.cap-page .cap-field-reset {
+          grid-column: 2;
+          margin-top: 14px;
+        }
+        body.cap-page .cap-field-control {
+          grid-column: 1 / -1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        body.cap-page *,
+        body.cap-page *::before,
+        body.cap-page *::after {
+          animation: none !important;
+          transition: none !important;
+        }
       }
     </style>
   </head>
-  <body class="cap-page">
-    <main class="cap-main">
-      <h1>nijimaku capture</h1>
+  <body class="cap-page" data-live="off">
+    <div class="cap-shell">
+      <header class="cap-header">
+        <div class="cap-brand">
+          <h1>nijimaku</h1>
+          <p class="cap-tagline">配信の声を、日本語と英語の字幕に</p>
+        </div>
+        <span class="cap-live" id="cap-live" role="status">停止中</span>
+      </header>
 
-      <section class="cap-card">
-        <div class="cap-row">
-          <label for="cap-device">マイク</label>
-          <select id="cap-device">
-            <option value="">既定のマイク</option>
-          </select>
-        </div>
-        <div class="cap-row">
-          <button type="button" id="cap-start">開始</button>
-          <button type="button" id="cap-stop" disabled>停止</button>
-        </div>
-        <div class="cap-row">
-          <span>レベル</span>
-          <div class="cap-meter">
-            <div class="cap-meter-bar" id="cap-meter-bar"></div>
-            <div class="cap-meter-threshold" id="cap-meter-threshold" title="発話とみなす音量" hidden></div>
+      <section class="cap-console" id="cap-console" aria-label="音声の入力">
+        <div class="cap-console-main">
+          <div>
+            <button type="button" class="cap-go" id="cap-start">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.52.86l10.4-6.4a1 1 0 0 0 0-1.72L9.52 4.74A1 1 0 0 0 8 5.6z" fill="currentColor" /></svg>
+              開始
+            </button>
+            <button type="button" class="cap-halt" id="cap-stop" hidden disabled>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" /></svg>
+              停止
+            </button>
           </div>
-          <span class="cap-meter-value" id="cap-meter-value">-</span>
-        </div>
-      </section>
-
-      <section class="cap-card">
-        <dl>
-          <dt>サーバー接続</dt>
-          <dd id="cap-ws-state">未接続</dd>
-          <dt>文字起こし</dt>
-          <dd><span class="cap-status" id="cap-rt-state">-</span></dd>
-        </dl>
-      </section>
-
-      <section class="cap-card">
-        <div class="cap-row">
-          <button type="button" id="cap-pip">字幕をPiPで開く</button>
-          <span class="cap-note" id="cap-pip-note"></span>
-        </div>
-        <div class="cap-row">
-          <a href="./overlay.html" target="_blank">字幕ページ（overlay.html）を新しいタブで開く</a>
-          <span class="cap-note">OBSのブラウザソースにはこのURLを入れる</span>
-        </div>
-      </section>
-
-      <section class="cap-card" id="cap-settings" hidden>
-        <h2>設定</h2>
-        <div>
-          <h3>OpenAI APIキー</h3>
-          <form id="cap-api-key-form">
-            <div class="cap-fields">
-              <label class="cap-field-label" for="cap-api-key">APIキー</label>
-              <div class="cap-field-control">
-                <input type="password" id="cap-api-key" autocomplete="off" spellcheck="false" maxlength="1024" required disabled />
-                <span class="cap-field-hint" id="cap-api-key-state" role="status" aria-live="polite">接続中…</span>
-              </div>
-              <button type="submit" id="cap-api-key-save" disabled>保存</button>
+          <div class="cap-input">
+            <div class="cap-device">
+              <label for="cap-device">マイク</label>
+              <select id="cap-device">
+                <option value="">既定のマイク</option>
+              </select>
             </div>
-          </form>
-          <p class="cap-field-hint">APIキーはこのPCに保存されます。保存済みのキーは画面に表示されません。</p>
-          <button type="button" id="cap-api-key-reset" hidden disabled>保存したキーを削除</button>
-          <p class="cap-message" id="cap-api-key-message" role="status" aria-live="polite"></p>
+            <div class="cap-meter-row">
+              <div class="cap-meter" id="cap-meter">
+                <div class="cap-meter-track"><div class="cap-meter-bar" id="cap-meter-bar"></div></div>
+                <div class="cap-meter-threshold" id="cap-meter-threshold" title="発話とみなす音量" hidden></div>
+              </div>
+              <span class="cap-meter-value" id="cap-meter-value">-</span>
+            </div>
+          </div>
+          <dl class="cap-stats">
+            <div class="cap-stat" id="cap-ws-stat" data-tone="idle">
+              <dt>サーバー</dt>
+              <dd id="cap-ws-state">未接続</dd>
+            </div>
+            <div class="cap-stat" id="cap-rt-stat" data-tone="idle">
+              <dt>文字起こし</dt>
+              <dd><span id="cap-rt-state">-</span><span class="cap-stat-detail" id="cap-rt-detail"></span></dd>
+            </div>
+          </dl>
         </div>
-        <p class="cap-note">変えた設定はすぐ反映され、このPCに保存されます。「既定」で初期設定に戻します。</p>
-        <div>
-          <h3>入力</h3>
-          <div class="cap-fields" data-section="input"></div>
+        <div class="cap-setup" id="cap-setup" hidden>
+          <span>はじめにOpenAIのAPIキーを設定してください。</span>
+          <button type="button" class="cap-btn cap-btn-primary" id="cap-setup-key">APIキーを設定</button>
         </div>
-        <div>
-          <h3>文字起こし・英訳</h3>
-          <div class="cap-fields" data-section="transcription"></div>
+        <p class="cap-message" id="cap-message" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="cap-card cap-output" aria-label="字幕の出し先">
+        <div class="cap-output-item">
+          <div>
+            <h2>OBS用URL</h2>
+            <p class="cap-note">ブラウザソースのURLに入れる。幅と高さは配信の解像度（例: 1920×1080）にする。</p>
+          </div>
+          <div class="cap-url">
+            <input type="text" id="cap-overlay-url" readonly spellcheck="false" aria-label="字幕ページのURL" value="./overlay.html" />
+            <button type="button" class="cap-btn" id="cap-copy-url">コピー</button>
+            <a class="cap-btn" href="./overlay.html" target="_blank" rel="noopener">開く</a>
+          </div>
         </div>
-        <div>
-          <h3>表示（OBSとPiP）</h3>
-          <div class="cap-preview" id="cap-preview"></div>
-          <p class="cap-field-hint">見本の字幕を、1920×1080のOBSの画面に出したときの見え方で縮小表示する。PiPでは大きさと位置がPiP用の値になる。</p>
-          <div class="cap-fields" data-section="display"></div>
+        <div class="cap-output-item">
+          <div>
+            <h2>手元モニター</h2>
+            <p class="cap-note">配信中に字幕が出ているか、他の画面より常に手前に出てくる小さな画面で確認できます。</p>
+            <p class="cap-note is-warn" id="cap-pip-note"></p>
+          </div>
+          <div>
+            <button type="button" class="cap-btn" id="cap-pip">PiPで開く</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="cap-card cap-settings" id="cap-settings" hidden>
+        <div class="cap-settings-head">
+          <h2>設定</h2>
+          <p class="cap-note">変更はすぐに反映されます。</p>
+        </div>
+        <div class="cap-tabs" role="tablist" aria-label="設定の種類">
+          <button type="button" class="cap-tab" role="tab" id="cap-tab-display" data-tab="display" aria-controls="cap-panel-display">表示</button>
+          <button type="button" class="cap-tab" role="tab" id="cap-tab-input" data-tab="input" aria-controls="cap-panel-input">入力</button>
+          <button type="button" class="cap-tab" role="tab" id="cap-tab-transcription" data-tab="transcription" aria-controls="cap-panel-transcription">文字起こし・英訳</button>
+          <button type="button" class="cap-tab" role="tab" id="cap-tab-key" data-tab="key" aria-controls="cap-panel-key">APIキー</button>
         </div>
         <p class="cap-message" id="cap-settings-message" role="status" aria-live="polite"></p>
-      </section>
-      <p class="cap-note" id="cap-settings-note" hidden>設定は http://localhost で開いたときだけ変えられます。</p>
 
-      <p class="cap-message" id="cap-message" role="status" aria-live="polite"></p>
-    </main>
+        <div class="cap-panel" role="tabpanel" id="cap-panel-display" aria-labelledby="cap-tab-display">
+          <div class="cap-display">
+            <figure class="cap-preview-wrap">
+              <figcaption class="cap-preview-head">プレビュー<span class="cap-chip">OBS 1920×1080</span></figcaption>
+              <div class="cap-preview" id="cap-preview"></div>
+              <p class="cap-field-hint">見本の字幕を、1920×1080のOBSの画面に出したときの見え方で縮小表示する。PiPでは大きさが2/3になり、位置はPiP用の値になる。</p>
+            </figure>
+            <div class="cap-fields" data-section="display"></div>
+          </div>
+        </div>
+
+        <div class="cap-panel" role="tabpanel" id="cap-panel-input" aria-labelledby="cap-tab-input" hidden>
+          <p class="cap-note">メーターの白い線が「発話とみなす音量」。話していないときの音量より上、話しているときの音量より下に合わせる。</p>
+          <div class="cap-fields" data-section="input"></div>
+        </div>
+
+        <div class="cap-panel" role="tabpanel" id="cap-panel-transcription" aria-labelledby="cap-tab-transcription" hidden>
+          <div class="cap-fields" data-section="transcription"></div>
+        </div>
+
+        <div class="cap-panel" role="tabpanel" id="cap-panel-key" aria-labelledby="cap-tab-key" hidden>
+          <form class="cap-key" id="cap-api-key-form">
+            <label for="cap-api-key">OpenAI APIキー</label>
+            <div class="cap-key-row">
+              <input type="password" id="cap-api-key" autocomplete="off" spellcheck="false" maxlength="1024" required disabled />
+              <button type="submit" class="cap-btn cap-btn-primary" id="cap-api-key-save" disabled>保存</button>
+            </div>
+            <span class="cap-key-state" id="cap-api-key-state" role="status" aria-live="polite">接続中…</span>
+          </form>
+          <div class="cap-key-actions">
+            <p class="cap-field-hint">APIキーはこのPCに保存されます。保存済みのキーは画面に表示されません。</p>
+            <button type="button" class="cap-btn cap-btn-danger" id="cap-api-key-reset" hidden disabled>保存したキーを削除</button>
+            <p class="cap-message" id="cap-api-key-message" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+      <p class="cap-note cap-settings-off" id="cap-settings-note" hidden>設定は http://localhost で開いたときだけ変えられます。</p>
+    </div>
     <script type="module" src="./capture.js"></script>
   </body>
 </html>

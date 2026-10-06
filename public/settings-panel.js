@@ -38,6 +38,18 @@ function joinColor(hex, alpha) {
 }
 
 /**
+ * スライダーの値と、つまみの左側を塗る幅をそろえる
+ * @param {HTMLInputElement} slider
+ * @param {string} value
+ */
+function setSlider(slider, value) {
+  slider.value = value;
+  const min = Number(slider.min);
+  const ratio = (slider.valueAsNumber - min) / (Number(slider.max) - min);
+  slider.style.setProperty("--cap-fill", `${(ratio * 100).toFixed(2)}%`);
+}
+
+/**
  * @param {{card: HTMLElement, note: HTMLElement, message: HTMLElement, onValues: (values: Record<string, unknown>, styleVars: Record<string, string>) => void, onCredentials: (status: any) => void}} opts
  */
 export function mountSettings({ card, note, message, onValues, onCredentials }) {
@@ -46,7 +58,7 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
     note.hidden = false;
     return;
   }
-  /** @type {Map<string, {field: any, input?: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, glossary?: {el: HTMLElement, render: (value: any[]) => void}, reset: HTMLButtonElement, hint: HTMLElement, picker?: HTMLInputElement}>} */
+  /** @type {Map<string, {field: any, input?: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, widget?: {el: HTMLElement, render: (value: any[]) => void}, reset: HTMLButtonElement, picker?: HTMLInputElement, slider?: HTMLInputElement}>} */
   const rows = new Map();
   /** @type {WebSocket | null} */
   let ws = null;
@@ -88,6 +100,7 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
   function renderCredentials(msg) {
     keyReset.hidden = !msg.saved;
     keyInput.placeholder = msg.configured ? "変更するAPIキーを入力" : "APIキーを入力";
+    keyState.dataset.tone = !msg.configured || msg.state === "failed" ? "error" : msg.state === "ready" ? "ok" : "warn";
     const states = { connecting: "接続中", ready: "接続済み", rotating: "接続切り替え中", reconnecting: "再接続中", failed: "接続できません" };
     keyState.textContent = msg.configured
       ? `設定済み・${states[msg.state] ?? "接続待ち"}${msg.detail ? `: ${msg.detail}` : ""}`
@@ -125,6 +138,8 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
       case "boolean": {
         const input = document.createElement("input");
         input.type = "checkbox";
+        input.className = "cap-switch";
+        input.setAttribute("role", "switch");
         return input;
       }
       case "textarea": {
@@ -172,9 +187,15 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
     function addRow(entry) {
       const row = document.createElement("div");
       row.className = "cap-glossary-row";
+      const arrow = document.createElement("span");
+      arrow.className = "cap-glossary-arrow";
+      arrow.textContent = "→";
+      arrow.setAttribute("aria-hidden", "true");
       const del = document.createElement("button");
       del.type = "button";
-      del.textContent = "削除";
+      del.textContent = "×";
+      del.title = "削除";
+      del.setAttribute("aria-label", "削除");
       // 末尾の空行は追加用なので消せない
       del.disabled = !entry;
       del.addEventListener("click", () => {
@@ -182,7 +203,7 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
         submit();
         render(latest);
       });
-      row.append(textInput(entry?.ja ?? "", "日本語"), textInput(entry?.en ?? "", "英語"), del);
+      row.append(textInput(entry?.ja ?? "", "日本語"), arrow, textInput(entry?.en ?? "", "英語"), del);
       el.append(row);
     }
 
@@ -267,18 +288,20 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
       control.className = "cap-field-control";
       const hint = document.createElement("span");
       hint.className = "cap-field-hint";
+      hint.textContent = field.help ?? "";
+      hint.hidden = !field.help;
 
       const reset = document.createElement("button");
       reset.type = "button";
       reset.className = "cap-field-reset";
-      reset.textContent = "既定";
+      reset.textContent = "リセット";
       reset.addEventListener("click", () => send({ type: "reset", key: field.key }));
 
       if (field.kind === "glossary" || field.kind === "list") {
         const widget = field.kind === "glossary" ? createGlossary(field) : createChecklist(field);
         control.append(widget.el, hint);
         container.append(label, control, reset);
-        rows.set(field.key, { field, widget, reset, hint });
+        rows.set(field.key, { field, widget, reset });
         continue;
       }
 
@@ -289,17 +312,27 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
       input.id = id;
       line.append(input);
       let picker;
+      let slider;
       if (field.kind === "color") {
         picker = createPicker(field, input);
-        line.append(picker);
+        line.prepend(picker);
+      } else if (input.type === "number") {
+        slider = createSlider(field, /** @type {HTMLInputElement} */ (input));
+        line.prepend(slider);
       }
       const unit = field.kind === "px" ? "px" : field.kind === "percent" ? "%" : field.unit;
-      if (unit) line.append(unit);
+      // 単位が無い数値の項目にも同じ幅の枠を置き、スライダーと数値の欄の位置を項目間でそろえる
+      if (unit || slider) {
+        const unitEl = document.createElement("span");
+        unitEl.className = "cap-field-unit";
+        unitEl.textContent = unit ?? "";
+        line.append(unitEl);
+      }
       control.append(line, hint);
 
       input.addEventListener("change", () => onChange(field, input));
       container.append(label, control, reset);
-      rows.set(field.key, { field, input, reset, hint, picker });
+      rows.set(field.key, { field, input, reset, picker, slider });
     }
   }
 
@@ -323,6 +356,36 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
     });
     picker.addEventListener("change", submit);
     return picker;
+  }
+
+  // 数値の欄に添えるスライダー。ドラッグ中も字幕に反映する。送るたびにsettings.jsonへ書くので、送る間隔を空ける
+  function createSlider(field, input) {
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.className = "cap-range";
+    slider.min = input.min;
+    slider.max = input.max;
+    slider.step = input.step;
+    // 同じ値を数値の欄でも変えられるので、Tabの移動と読み上げからは外す
+    slider.tabIndex = -1;
+    slider.setAttribute("aria-hidden", "true");
+    let timer = 0;
+    const submit = () => {
+      clearTimeout(timer);
+      timer = 0;
+      input.value = slider.value;
+      onChange(field, input);
+    };
+    slider.addEventListener("input", () => {
+      input.value = slider.value;
+      setSlider(slider, slider.value);
+      if (!timer) timer = setTimeout(submit, 100);
+    });
+    slider.addEventListener("change", submit);
+    input.addEventListener("input", () => {
+      if (input.value !== "") setSlider(slider, input.value);
+    });
+    return slider;
   }
 
   function onChange(field, input) {
@@ -362,33 +425,26 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
     return String(value);
   }
 
-  function update(row, value, defaultValue, overridden) {
-    const { field, input, widget, reset, hint, picker } = row;
+  function update(row, value, overridden) {
+    const { field, input, widget, reset, picker, slider } = row;
+    // 入力中の欄とドラッグ中のスライダーは上書きしない（届くのは送った途中の値のこともある）
+    const editing = document.activeElement === input || slider?.matches(":active") === true;
     if (widget) {
       widget.render(value ?? []);
-    } else if (input && document.activeElement !== input) {
-      // 入力中の欄は上書きしない
+    } else if (input && !editing) {
       if (field.kind === "boolean") /** @type {HTMLInputElement} */ (input).checked = value === true;
       else input.value = format(field, value);
     }
-    let defaultText;
     if (field.kind === "px" || field.kind === "percent" || field.kind === "color") {
       const css = cssDefault(field.cssVar);
       // 未設定でも既定値を入れておき、上下キーでそこから調整できるようにする。単位は欄の右に出すので数字だけ
       let shown = css;
       if (field.kind === "px") shown = css.replace(/px$/, "");
       else if (field.kind === "percent") shown = String(Math.round(Number(css) * 100));
-      if (value === null && input && document.activeElement !== input) input.value = shown;
-      defaultText = `overlay.cssの値（${field.kind === "percent" ? `${shown}%` : css}）`;
+      if (value === null && input && !editing) input.value = shown;
       if (picker && document.activeElement !== picker) picker.value = splitColor(value ?? css).hex;
-    } else if (field.kind === "font") {
-      defaultText = "OSのフォント（Macはヒラギノ角ゴ、Windowsは游ゴシック）";
-    } else if (field.kind === "boolean") {
-      defaultText = defaultValue ? "オン" : "オフ";
-    } else {
-      defaultText = format(field, defaultValue) || "（空）";
     }
-    hint.textContent = [field.help, `既定: ${defaultText}`].filter(Boolean).join(" / ");
+    if (slider && input && !slider.matches(":active") && input.value !== "") setSlider(slider, input.value);
     reset.hidden = !overridden;
   }
 
@@ -400,7 +456,7 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
     card.hidden = false;
     setMessage("");
     const overridden = new Set(msg.overridden);
-    for (const [key, row] of rows) update(row, msg.values[key], msg.defaults[key], overridden.has(key));
+    for (const [key, row] of rows) update(row, msg.values[key], overridden.has(key));
     onValues(msg.values, msg.styleVars ?? {});
   }
 
@@ -440,6 +496,7 @@ export function mountSettings({ card, note, message, onValues, onCredentials }) 
       keyInput.value = "";
       keyPending = false;
       keyState.textContent = "サーバーとの接続が切れました。再接続中…";
+      keyState.dataset.tone = "warn";
       setKeyMessage("");
       updateKeyButtons();
       if (built) setMessage("サーバーとの接続が切れました。再接続中…", true);

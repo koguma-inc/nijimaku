@@ -74,7 +74,7 @@ export const FIELDS: Field[] = [
   { key: "styleFont", section: "display", label: "フォント", kind: "font", cssVar: "--nm-font-family", options: ["Noto Sans JP", "Noto Serif JP"], help: "NotoはGoogle Fontsから読み込む（OBSのPCがインターネットにつながっている必要がある）" },
   { key: "styleJaSize", section: "display", label: "日本語の文字の大きさ", kind: "px", cssVar: "--nm-ja-size", min: 8, max: 200 },
   { key: "styleEnSize", section: "display", label: "英語の文字の大きさ", kind: "px", cssVar: "--nm-en-size", min: 8, max: 200 },
-  { key: "styleEnGap", section: "display", label: "日本語と英語の間隔", kind: "px", cssVar: "--nm-en-gap", min: -50, max: 100, help: "行の高さの余白に足す。負の値で詰める" },
+  { key: "styleEnGap", section: "display", label: "日本語と英語の間隔", kind: "px", cssVar: "--nm-en-gap", min: -10, max: 10, help: "行の高さの余白に足す。負の値で詰める" },
   { key: "styleJaColor", section: "display", label: "日本語の色", kind: "color", cssVar: "--nm-ja-color" },
   { key: "styleEnColor", section: "display", label: "英語の色", kind: "color", cssVar: "--nm-en-color" },
   { key: "stylePartialOpacity", section: "display", label: "途中経過の不透明度", kind: "percent", cssVar: "--nm-partial-opacity", min: 0, max: 100, help: "確定前の文を、縁取りごと薄くする" },

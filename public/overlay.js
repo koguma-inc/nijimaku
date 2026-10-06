@@ -89,7 +89,7 @@ export function mountOverlay(container) {
   let backoff = BACKOFF_MIN_MS;
   let unmounted = false;
 
-  // 設定パネルで変えたCSS変数だけを:rootに上書きする。PiPではbody.is-pipで定義した変数（大きさ・位置等）が優先される
+  // 設定パネルで変えたCSS変数だけを:rootに上書きする。PiPではbody.is-pipで定義した変数（倍率・位置）が優先される
   function applyStyle(vars) {
     const style = doc.documentElement.style;
     const next = new Set();
