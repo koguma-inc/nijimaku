@@ -932,11 +932,17 @@
         border-radius: 50%;
         background: var(--ui-faint);
       }
-      body.cap-page .cap-key-actions {
+      body.cap-page .cap-key-actions,
+      body.cap-page .cap-backup {
         display: grid;
         justify-items: start;
         gap: 12px;
         max-width: 640px;
+      }
+      body.cap-page .cap-backup-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
       }
 
       @keyframes cap-blink {
@@ -1131,6 +1137,7 @@
           <button type="button" class="cap-tab" role="tab" id="cap-tab-input" data-tab="input" aria-controls="cap-panel-input">入力</button>
           <button type="button" class="cap-tab" role="tab" id="cap-tab-transcription" data-tab="transcription" aria-controls="cap-panel-transcription">文字起こし</button>
           <button type="button" class="cap-tab" role="tab" id="cap-tab-key" data-tab="key" aria-controls="cap-panel-key">APIキー</button>
+          <button type="button" class="cap-tab" role="tab" id="cap-tab-backup" data-tab="backup" aria-controls="cap-panel-backup">バックアップ</button>
         </div>
         <p class="cap-message" id="cap-settings-message" role="status" aria-live="polite"></p>
 
@@ -1167,6 +1174,19 @@
             <p class="cap-field-hint">APIキーはサーバーを動かしているPCに保存されます。保存済みのキーは画面に表示されません。</p>
             <button type="button" class="cap-btn cap-btn-danger" id="cap-api-key-reset" hidden disabled>保存したキーを削除</button>
             <p class="cap-message" id="cap-api-key-message" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <div class="cap-panel" role="tabpanel" id="cap-panel-backup" aria-labelledby="cap-tab-backup" hidden>
+          <div class="cap-backup">
+            <p class="cap-field-hint">表示・入力・文字起こしで変えた設定をファイルに書き出し、読み込んで戻せます。APIキーは含まれません。</p>
+            <div class="cap-backup-row">
+              <button type="button" class="cap-btn" id="cap-backup-export">書き出す</button>
+              <button type="button" class="cap-btn" id="cap-backup-import">読み込む</button>
+              <input type="file" id="cap-backup-file" accept=".json,application/json" hidden />
+            </div>
+            <p class="cap-field-hint">読み込むと、今の設定はファイルの内容に置き換わります（ファイルに無い項目は既定値に戻ります）。</p>
+            <p class="cap-message" id="cap-backup-message" role="status" aria-live="polite"></p>
           </div>
         </div>
       </section>

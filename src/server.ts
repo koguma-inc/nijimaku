@@ -13,7 +13,7 @@ import { createLogger, createNoopLogger } from "./log.ts";
 import { openBrowser } from "./open-browser.ts";
 import { RealtimeSession, type TranscriptionConfig } from "./realtime.ts";
 import { SegmentStore, type Snapshot } from "./segments.ts";
-import { SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
+import { FIELDS, SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
 import { Updater, type UpdateStatus } from "./update.ts";
 import type { VadOptions } from "./vad.ts";
 
@@ -118,7 +118,8 @@ const pipeline = new AudioPipeline({ vad: vadOptions(initial) }, realtime, logge
 
 const settingsClients = new Set<WebSocket>();
 // 拒否されたら元に戻す値。session.updateのevent_idごと（同じ変更を2接続へ送ったときは同じ記録を共有する）
-type Revert = { key: string; prev: unknown; wasOverridden: boolean; done: boolean };
+type RevertEntry = { key: string; prev: unknown; wasOverridden: boolean };
+type Revert = { entries: RevertEntry[]; done: boolean };
 const pendingUpdates = new Map<string, Revert>();
 
 function vadOptions(s: Settings): VadOptions {
@@ -162,14 +163,13 @@ function styleMessage(): Record<string, unknown> {
   return { type: "style", vars: settingsStore.styleVars() };
 }
 
+function revertEntry(key: string): RevertEntry {
+  return { key, prev: settingsStore.values[key], wasOverridden: settingsStore.overridden.includes(key) };
+}
+
 function changeSetting(ws: WebSocket, key: string, op: () => string | undefined): void {
   const before = settingsStore.current;
-  const revert: Revert = {
-    key,
-    prev: settingsStore.values[key],
-    wasOverridden: settingsStore.overridden.includes(key),
-    done: false,
-  };
+  const revert: Revert = { entries: [revertEntry(key)], done: false };
   const error = op();
   if (error) {
     sendJson(ws, { type: "settings.error", key, message: error });
@@ -179,6 +179,30 @@ function changeSetting(ws: WebSocket, key: string, op: () => string | undefined)
   console.log(`[settings] ${key} = ${JSON.stringify(settingsStore.values[key])}`);
   for (const eventId of applySettings(before)) pendingUpdates.set(eventId, revert);
   broadcastSettings();
+}
+
+// バックアップの読み込み。文字起こしに拒否されたら、読み込みで変わった項目を全部元に戻す
+function importSettings(ws: WebSocket, values: unknown): void {
+  const before = settingsStore.current;
+  const entries = FIELDS.map((f) => revertEntry(f.key));
+  const result = settingsStore.replace(values);
+  if ("error" in result) {
+    sendJson(ws, { type: "settings.import.error", message: result.error });
+    return;
+  }
+  const changed = entries.filter(
+    (e) =>
+      JSON.stringify(e.prev) !== JSON.stringify(settingsStore.values[e.key]) ||
+      e.wasOverridden !== settingsStore.overridden.includes(e.key),
+  );
+  const keys = changed.map((e) => e.key);
+  logger.log("settings.import", { keys, warnings: result.warnings });
+  console.log(`[settings] 読み込みました: ${keys.join(", ") || "変更なし"}`);
+  for (const warning of result.warnings) console.warn(`[settings] ${warning}`);
+  const revert: Revert = { entries: changed, done: false };
+  for (const eventId of applySettings(before)) pendingUpdates.set(eventId, revert);
+  broadcastSettings();
+  sendJson(ws, { type: "settings.imported", warnings: result.warnings });
 }
 
 // 変わった部品へだけ反映する。文字起こしへ送ったsession.updateのevent_idを返す
@@ -202,13 +226,16 @@ function revertTranscription(eventId: string, message: string): void {
   if (!revert || revert.done) return;
   revert.done = true;
   const before = settingsStore.current;
-  if (revert.wasOverridden) settingsStore.set(revert.key, revert.prev);
-  else settingsStore.reset(revert.key);
-  logger.log("settings.revert", { key: revert.key, message });
-  console.warn(`[settings] ${revert.key}を元に戻しました: ${message}`);
+  for (const e of revert.entries) {
+    if (e.wasOverridden) settingsStore.set(e.key, e.prev);
+    else settingsStore.reset(e.key);
+  }
+  const keys = revert.entries.map((e) => e.key);
+  logger.log("settings.revert", { keys, message });
+  console.warn(`[settings] ${keys.join(", ")}を元に戻しました: ${message}`);
   applySettings(before);
   broadcastSettings();
-  broadcastJson(settingsClients, { type: "settings.error", key: revert.key, message: `${message}（元の値に戻しました）` });
+  broadcastJson(settingsClients, { type: "settings.error", message: `${message}（元の値に戻しました）` });
 }
 
 function broadcastSettings(): void {
@@ -318,7 +345,8 @@ function pathnameOf(req: IncomingMessage): string {
 
 const captureWss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
 const overlayWss = new WebSocketServer({ noServer: true, maxPayload: 1 << 16 });
-const settingsWss = new WebSocketServer({ noServer: true, maxPayload: 1 << 16 });
+// 用語集と配信の説明を上限まで入れた設定の読み込み（import）が収まる大きさ
+const settingsWss = new WebSocketServer({ noServer: true, maxPayload: 1 << 17 });
 
 const WSS_BY_PATH: Record<string, WebSocketServer> = {
   "/ws/capture": captureWss,
@@ -424,6 +452,10 @@ settingsWss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       if (!local) sendJson(ws, { type: "update.error", message: "更新は、Nijimakuを動かしているPCで開いたページからだけ実行できます" });
       // 受け付けなかったとき（確認中・適用中など）は今の状態を返す
       else if (!updater?.apply()) sendJson(ws, updateStatusMessage());
+      return;
+    }
+    if (message.type === "import") {
+      importSettings(ws, message.values);
       return;
     }
     if (typeof message.key !== "string") return;

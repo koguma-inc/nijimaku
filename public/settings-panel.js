@@ -4,6 +4,8 @@ import { createVersionWatch } from "./overlay.js";
 
 const BACKOFF_MIN_MS = 1000;
 const BACKOFF_MAX_MS = 30000;
+// 読み込むファイルの上限。送るメッセージ（整形を除いたJSON）が/ws/settingsのmaxPayload（128KiB）に収まるようにする
+const IMPORT_FILE_LIMIT = 100_000;
 
 const colorCtx = /** @type {CanvasRenderingContext2D} */ (document.createElement("canvas").getContext("2d"));
 const languageNames = new Intl.DisplayNames(["ja"], { type: "language" });
@@ -73,6 +75,12 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
   // サーバーは保存にも削除にもcredentials.savedで応えるため、どちらを送ったかを覚えておく
   /** @type {"" | "set" | "reset"} */
   let keyPending = "";
+  const backupExport = card.querySelector("#cap-backup-export");
+  const backupImport = card.querySelector("#cap-backup-import");
+  const backupFile = /** @type {HTMLInputElement} */ (card.querySelector("#cap-backup-file"));
+  const backupMessage = card.querySelector("#cap-backup-message");
+  /** @type {{values: Record<string, unknown>, overridden: string[]} | null} */
+  let latest = null;
 
   function setKeyMessage(text, isError = false) {
     keyMessage.textContent = text;
@@ -97,6 +105,51 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
     keyPending = "reset";
     setKeyMessage("削除中…");
     updateKeyButtons();
+  });
+
+  function setBackupMessage(text, isError = false) {
+    backupMessage.textContent = text;
+    backupMessage.classList.toggle("is-error", isError);
+  }
+
+  // settings.jsonと同じ形（画面で変えた項目だけ）で書き出す。APIキーは含めない
+  backupExport.addEventListener("click", () => {
+    if (!latest) return;
+    const { values, overridden } = latest;
+    const data = Object.fromEntries(overridden.map((key) => [key, values[key]]));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" }));
+    const d = new Date();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `nijimaku-settings-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    setBackupMessage("書き出しました。");
+  });
+
+  backupImport.addEventListener("click", () => backupFile.click());
+
+  backupFile.addEventListener("change", async () => {
+    const file = backupFile.files?.[0];
+    // 同じファイルを選び直しても読み込めるようにする
+    backupFile.value = "";
+    if (!file) return;
+    if (file.size > IMPORT_FILE_LIMIT) {
+      setBackupMessage("ファイルが大きすぎます。書き出した設定のファイルを選んでください。", true);
+      return;
+    }
+    let values;
+    try {
+      values = JSON.parse(await file.text());
+    } catch {
+      setBackupMessage("ファイルを読めません。書き出した設定のファイルを選んでください。", true);
+      return;
+    }
+    if (!send({ type: "import", values })) {
+      setBackupMessage("サーバーとの接続が切れています。", true);
+      return;
+    }
+    setBackupMessage("読み込み中…");
   });
 
   function renderCredentials(msg) {
@@ -457,6 +510,7 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
     }
     card.hidden = false;
     setMessage("");
+    latest = msg;
     const overridden = new Set(msg.overridden);
     for (const [key, row] of rows) update(row, msg.values[key], overridden.has(key));
     onValues(msg.values, msg.styleVars ?? {});
@@ -481,6 +535,10 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
       }
       if (msg?.type === "settings") render(msg);
       else if (msg?.type === "settings.error") setMessage(String(msg.message), true);
+      else if (msg?.type === "settings.imported") {
+        const warnings = Array.isArray(msg.warnings) ? msg.warnings.map(String) : [];
+        setBackupMessage(warnings.length > 0 ? `読み込みました。${warnings.join("。")}。` : "読み込みました。", warnings.length > 0);
+      } else if (msg?.type === "settings.import.error") setBackupMessage(String(msg.message), true);
       else if (msg?.type === "credentials.status") renderCredentials(msg);
       else if (msg?.type === "app.info") {
         if (isNewVersion(msg.version)) location.reload();
@@ -506,6 +564,7 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
       keyState.textContent = "サーバーとの接続が切れました。再接続中…";
       keyState.dataset.tone = "warn";
       setKeyMessage("");
+      setBackupMessage("");
       updateKeyButtons();
       if (built) setMessage("サーバーとの接続が切れました。再接続中…", true);
       setTimeout(connect, backoff);

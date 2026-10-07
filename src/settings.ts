@@ -6,6 +6,8 @@
 //     サーバー→ページ: {type: "settings", fields, values, defaults, overridden, styleVars}
 //                      {type: "settings.error", key?, message}
 //     ページ→サーバー: {type: "set", key, value} / {type: "reset", key}
+//                      {type: "import", values}（バックアップの読み込み。valuesはsettings.jsonと同じ形）
+//     サーバー→ページ: {type: "settings.imported", warnings} / {type: "settings.import.error", message}
 //   /ws/overlay  サーバー→ページ: {type: "style", vars}（画面で変えたCSS変数だけ）
 //   /ws/capture  サーバー→ページ: {type: "capture.config", mic, vadThresholdDb}
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -179,6 +181,26 @@ export function validate(field: Field, value: unknown): Validated {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseValues(saved: Record<string, unknown>): { values: Values; warnings: string[] } {
+  const values: Values = {};
+  const warnings: string[] = [];
+  for (const [key, value] of Object.entries(saved)) {
+    const field = FIELD_BY_KEY.get(key);
+    if (!field) {
+      warnings.push(`不明な設定を無視しました: ${key}`);
+      continue;
+    }
+    const result = validate(field, value);
+    if (result.ok) values[key] = result.value;
+    else warnings.push(`使えない値を無視しました: ${result.message}`);
+  }
+  return { values, warnings };
+}
+
 export class SettingsStore {
   #defaults: Values;
   #overrides: Values = {};
@@ -198,19 +220,22 @@ export class SettingsStore {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
       return [`${this.#file}を読めません: ${err instanceof Error ? err.message : String(err)}`];
     }
-    if (typeof saved !== "object" || saved === null || Array.isArray(saved)) return [`${this.#file}の形式が不正です`];
-    const warnings: string[] = [];
-    for (const [key, value] of Object.entries(saved)) {
-      const field = FIELD_BY_KEY.get(key);
-      if (!field) {
-        warnings.push(`不明な設定を無視しました: ${key}`);
-        continue;
-      }
-      const result = validate(field, value);
-      if (result.ok) this.#overrides[key] = result.value;
-      else warnings.push(`保存された値を無視しました: ${result.message}`);
-    }
+    if (!isRecord(saved)) return [`${this.#file}の形式が不正です`];
+    const { values, warnings } = parseValues(saved);
+    this.#overrides = values;
     return warnings;
+  }
+
+  // バックアップの読み込み。ファイルに無い項目は既定値に戻す（置き換え）。読めない値は捨てて既定値にし、理由を返す
+  replace(saved: unknown): { warnings: string[] } | { error: string } {
+    // 別のJSONを選んだときに、全項目を既定値に戻してしまわないようにする
+    if (!isRecord(saved) || (Object.keys(saved).length > 0 && !Object.keys(saved).some((key) => FIELD_BY_KEY.has(key)))) {
+      return { error: "Nijimakuの設定のファイルではありません" };
+    }
+    const { values, warnings } = parseValues(saved);
+    this.#overrides = values;
+    this.#save();
+    return { warnings };
   }
 
   get current(): Settings {

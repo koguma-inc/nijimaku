@@ -66,6 +66,23 @@ test("壊れたファイルは警告を返し、既定値で動く", () => {
   assert.equal(store.values.vadSilenceMs, 800);
 });
 
+test("replaceはファイルに無い項目を既定値に戻し、使えない値は捨てて警告する。設定のファイルでなければ何も変えない", () => {
+  const file = tempFile();
+  const store = new SettingsStore(DEFAULTS, file);
+  store.set("vadThresholdDb", -50);
+
+  assert.ok("error" in store.replace({ openaiApiKey: "x" }));
+  assert.ok("error" in store.replace([]));
+  assert.equal(store.values.vadThresholdDb, -50);
+
+  const result = store.replace({ vadSilenceMs: 600, styleJaSize: 99999, unknownKey: 1 });
+  assert.ok("warnings" in result);
+  assert.equal(result.warnings.length, 2);
+  assert.equal(store.values.vadThresholdDb, -45);
+  assert.equal(store.values.styleJaSize, null);
+  assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { vadSilenceMs: 600 });
+});
+
 test("用語集: 前後の空白を除き、空行を捨て、英語の無い行はjaだけにする。重複・日本語の無い行・<、>は拒否する", () => {
   const f = field("glossary");
   assert.deepEqual(
