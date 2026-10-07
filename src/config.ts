@@ -43,10 +43,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean),
-    // -45と800は仮の値で、マイクでの実機確認で決め直す。無音500msでは区切りの約4分の1で1秒以内に話が続き、
+    // -45と600は仮の値で、マイクでの実機確認で決め直す。無音500msでは区切りの約4分の1で1秒以内に話が続き、
     // 短い断片ほど誤認識が増えた
     vadThresholdDb: num(env, "VAD_THRESHOLD_DB", -45),
-    vadSilenceMs: num(env, "VAD_SILENCE_MS", 800),
+    vadSilenceMs: num(env, "VAD_SILENCE_MS", 600),
     vadMinSpeechMs: num(env, "VAD_MIN_SPEECH_MS", 200),
     vadMaxSegmentMs: num(env, "VAD_MAX_SEGMENT_MS", 15000),
     // 未指定では文が途中から切れた。minimalはpartialが約0.28秒早いだけでfinalは早まらず、誤りが増えた
