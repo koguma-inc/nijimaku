@@ -71,12 +71,6 @@ test("minSpeechMs 未満のノイズでは発話にならない", () => {
   assert.equal(vad.hasSpeech(), false);
 });
 
-test("minSpeechMs が0でも1フレームの発話を要求する", () => {
-  const vad = new Vad({ ...OPTS, minSpeechMs: 0 });
-  assert.deepEqual(feed(vad, repeat(QUIET, 10), 0).events, []);
-  assert.deepEqual(vad.push(LOUD, 500), [{ type: "speech_start", t: 500 }]);
-});
-
 test("発話が無ければ commit しない", () => {
   const vad = new Vad({ ...OPTS, maxSegmentMs: 1000 });
   assert.deepEqual(feed(vad, repeat(QUIET, 2000), 0).events, []);

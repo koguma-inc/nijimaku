@@ -10,7 +10,7 @@
 //     サーバー→ページ: {type: "settings.imported", warnings} / {type: "settings.import.error", message}
 //   /ws/overlay  サーバー→ページ: {type: "style", vars}（画面で変えたCSS変数だけ）
 //   /ws/capture  サーバー→ページ: {type: "capture.config", mic, vadThresholdDb}
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import type { Config } from "./config.ts";
 
 export type Section = "input" | "transcription" | "display";
@@ -233,8 +233,8 @@ export class SettingsStore {
       return { error: "Nijimakuの設定のファイルではありません" };
     }
     const { values, warnings } = parseValues(saved);
-    this.#overrides = values;
-    this.#save();
+    const error = this.#save(values);
+    if (error) return { error };
     return { warnings };
   }
 
@@ -256,17 +256,15 @@ export class SettingsStore {
     if (!field) return `不明な設定です: ${key}`;
     const result = validate(field, value);
     if (!result.ok) return result.message;
-    this.#overrides[key] = result.value;
-    this.#save();
-    return undefined;
+    return this.#save({ ...this.#overrides, [key]: result.value });
   }
 
   reset(key: string): string | undefined {
     if (!FIELD_BY_KEY.has(key)) return `不明な設定です: ${key}`;
     if (!(key in this.#overrides)) return undefined;
-    delete this.#overrides[key];
-    this.#save();
-    return undefined;
+    const values = { ...this.#overrides };
+    delete values[key];
+    return this.#save(values);
   }
 
   // CSS変数を画面で変えた項目だけ返す（overlay.cssの値を上書きする分）
@@ -297,9 +295,20 @@ export class SettingsStore {
   }
 
   // 書き込み途中で落ちても壊れたファイルを残さないよう、一時ファイルから置き換える
-  #save(): void {
+  #save(values: Values): string | undefined {
     const tmp = `${this.#file}.tmp`;
-    writeFileSync(tmp, JSON.stringify(this.#overrides, null, 2) + "\n");
-    renameSync(tmp, this.#file);
+    try {
+      writeFileSync(tmp, JSON.stringify(values, null, 2) + "\n");
+      renameSync(tmp, this.#file);
+    } catch {
+      try {
+        rmSync(tmp, { force: true });
+      } catch {
+        // 削除も失敗しても、使用中の設定は維持する。
+      }
+      return "設定を保存できません。このフォルダへの書き込み権限を確認してください。";
+    }
+    this.#overrides = values;
+    return undefined;
   }
 }

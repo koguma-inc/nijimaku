@@ -226,9 +226,16 @@ function revertTranscription(eventId: string, message: string): void {
   if (!revert || revert.done) return;
   revert.done = true;
   const before = settingsStore.current;
+  const values = settingsStore.values;
+  const restored = Object.fromEntries(settingsStore.overridden.map((key) => [key, values[key]]));
   for (const e of revert.entries) {
-    if (e.wasOverridden) settingsStore.set(e.key, e.prev);
-    else settingsStore.reset(e.key);
+    if (e.wasOverridden) restored[e.key] = e.prev;
+    else delete restored[e.key];
+  }
+  const result = settingsStore.replace(restored);
+  if ("error" in result) {
+    broadcastJson(settingsClients, { type: "settings.error", message: `${message}（元の値に戻せませんでした: ${result.error}）` });
+    return;
   }
   const keys = revert.entries.map((e) => e.key);
   logger.log("settings.revert", { keys, message });

@@ -18,20 +18,31 @@ class Socket extends EventEmitter {
     this.emit("close", 1000, Buffer.from("closed"));
   }
   terminate() { this.close(); }
+  disconnect() {
+    this.readyState = 3;
+    this.emit("close", 1006, Buffer.from("disconnected"));
+  }
   message(event: Record<string, unknown>) { this.emit("message", Buffer.from(JSON.stringify(event))); }
 }
 
-function setup(t: TestContext, apiKey = "") {
+function setup(t: TestContext, apiKey = "", rotateMin = 50) {
   const sockets: Socket[] = [];
   const keys: string[] = [];
   const partials: string[] = [];
+  const committed: [number, string][] = [];
+  const dropped: string[][] = [];
+  const rejected: [string, string][] = [];
   const logs: unknown[] = [];
   const handlers: RealtimeHandlers = {
     onPartial: (_id, text) => partials.push(text),
-    onFinal() {}, onCommitted() {}, onDropped() {}, onStatus() {}, onUpdateRejected() {},
+    onFinal() {},
+    onCommitted: (seq, id) => committed.push([seq, id]),
+    onDropped: (ids) => dropped.push(ids),
+    onStatus() {},
+    onUpdateRejected: (eventId, message) => rejected.push([eventId, message]),
   };
   const session = new RealtimeSession(
-    { apiKey, transcription: { ...transcription }, rotateMin: 50 }, handlers,
+    { apiKey, transcription: { ...transcription }, rotateMin }, handlers,
     { path: "", log: (kind, fields) => logs.push({ kind, ...fields }), close: async () => {} },
     (key) => {
       keys.push(key);
@@ -41,7 +52,12 @@ function setup(t: TestContext, apiKey = "") {
     },
   );
   t.after(() => session.stop());
-  return { session, sockets, keys, partials, logs };
+  return { session, sockets, keys, partials, committed, dropped, rejected, logs };
+}
+
+function ready(socket: Socket) {
+  socket.emit("open");
+  socket.message({ type: "session.updated" });
 }
 
 test("キー未設定では接続せず、設定変更や音声入力があってもAPIへ送らない", (t) => {
@@ -99,14 +115,134 @@ test("認証拒否はキーを含まないエラーで止まり、キーの変�
   session.setApiKey("sk-test-second");
   assert.equal(session.status.state, "connecting");
   assert.equal(sockets.length, 2);
+  sockets[1].emit("unexpected-response", null, { statusCode: 403, resume() {} });
+  assert.equal(session.status.state, "failed");
+  session.setApiKey("sk-test-second");
+  assert.equal(session.status.state, "connecting");
+  assert.equal(sockets.length, 3);
 });
 
-test("アクセス権を修正した後は、同じキーを保存し直して接続を再試行できる", (t) => {
+test("ローテーション後も旧接続のcompletedを待ち、完了後に閉じる", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const { session, sockets, committed } = setup(t, "sk-test-key", 1);
+  session.start();
+  ready(sockets[0]);
+  t.mock.timers.tick(60_000);
+  assert.equal(session.status.state, "rotating");
+  ready(sockets[1]);
+  assert.equal(session.commit(1), 1);
+  assert.equal(session.status.state, "ready");
+  assert.equal(sockets[0].closed, false);
+  session.append(Buffer.alloc(4_800));
+  assert.equal(session.commit(2), 2);
+  assert.equal(sockets[1].sent.at(-1)?.type, "input_audio_buffer.commit");
+  sockets[0].message({ type: "input_audio_buffer.committed", item_id: "old-item" });
+  assert.deepEqual(committed, [[1, "old-item"]]);
+  assert.equal(sockets[0].closed, false);
+  sockets[0].message({ type: "conversation.item.input_audio_transcription.completed", item_id: "old-item", transcript: "完了" });
+  assert.equal(sockets[0].closed, true);
+});
+
+test("未完了の旧接続は10秒で退役し、未完了itemを通知する", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const { session, sockets, dropped } = setup(t, "sk-test-key", 1);
+  session.start();
+  ready(sockets[0]);
+  session.commit(1);
+  sockets[0].message({ type: "input_audio_buffer.committed", item_id: "old-item" });
+  t.mock.timers.tick(60_000);
+  ready(sockets[1]);
+  session.commit(2);
+  t.mock.timers.tick(9_999);
+  assert.equal(sockets[0].closed, false);
+  t.mock.timers.tick(1);
+  assert.equal(sockets[0].closed, true);
+  assert.deepEqual(dropped, [["old-item"]]);
+});
+
+test("現行接続が先に切れたら準備中の次接続へ移り、そのreadyで保留音声を送る", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const { session, sockets } = setup(t, "sk-test-key", 1);
+  session.start();
+  ready(sockets[0]);
+  t.mock.timers.tick(60_000);
+  sockets[0].disconnect();
+  assert.equal(session.status.state, "connecting");
+  session.append(Buffer.alloc(4_800));
+  ready(sockets[1]);
+  assert.equal(session.status.state, "ready");
+  assert.equal(sockets[1].sent.at(-1)?.type, "input_audio_buffer.append");
+  assert.equal(sockets.length, 2);
+});
+
+test("committedは送信したcommitの順でseqに対応する", (t) => {
+  const { session, sockets, committed } = setup(t, "sk-test-key");
+  session.start();
+  ready(sockets[0]);
+  session.commit(3);
+  session.commit(4);
+  sockets[0].message({ type: "input_audio_buffer.committed", item_id: "first" });
+  sockets[0].message({ type: "input_audio_buffer.committed", item_id: "second" });
+  assert.deepEqual(committed, [[3, "first"], [4, "second"]]);
+});
+
+test("settings拒否は通知し、失敗したcommitをFIFOから除いて次のitemを対応づける", (t) => {
+  const { session, sockets, committed, rejected } = setup(t, "sk-test-key");
+  session.start();
+  ready(sockets[0]);
+  const [eventId] = session.updateTranscription({ ...transcription, prompt: "変更" });
+  sockets[0].message({ type: "error", error: { event_id: eventId, message: "拒否" } });
+  assert.deepEqual(rejected, [[eventId, "拒否"]]);
+  assert.equal(session.status.state, "ready");
+  session.commit(1);
+  session.commit(2);
+  sockets[0].message({ type: "error", error: { event_id: "commit_1", message: "短すぎる" } });
+  sockets[0].message({ type: "input_audio_buffer.committed", item_id: "kept" });
+  assert.deepEqual(committed, [[2, "kept"]]);
+});
+
+test("ready前のsession.update拒否は設定エラーとして止まり、変更後に復帰する", (t) => {
   const { session, sockets } = setup(t, "sk-test-key");
   session.start();
-  sockets[0].emit("unexpected-response", null, { statusCode: 403, resume() {} });
+  sockets[0].emit("open");
+  sockets[0].message({ type: "error", error: { event_id: "session_update", message: "設定エラー" } });
   assert.equal(session.status.state, "failed");
-  session.setApiKey("sk-test-key");
-  assert.equal(session.status.state, "connecting");
+  assert.equal(sockets[0].closed, true);
+  session.updateTranscription({ ...transcription, prompt: "修正" });
   assert.equal(sockets.length, 2);
+  ready(sockets[1]);
+  assert.equal(session.status.state, "ready");
+});
+
+test("切断時にpartialとcommitted済みitemの消失を通知する", (t) => {
+  const { session, sockets, dropped } = setup(t, "sk-test-key");
+  session.start();
+  ready(sockets[0]);
+  session.commit(1);
+  sockets[0].message({ type: "input_audio_buffer.committed", item_id: "committed" });
+  sockets[0].message({ type: "conversation.item.input_audio_transcription.delta", item_id: "partial", delta: "途中" });
+  sockets[0].disconnect();
+  assert.deepEqual(dropped, [["partial", "committed"]]);
+});
+
+test("再接続は指数バックオフし、readyで次回の待ち時間を戻す", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
+  const { session, sockets } = setup(t, "sk-test-key");
+  session.start();
+  ready(sockets[0]);
+  sockets[0].disconnect();
+  assert.equal(session.status.state, "reconnecting");
+  t.mock.timers.tick(999);
+  assert.equal(sockets.length, 1);
+  t.mock.timers.tick(1);
+  assert.equal(sockets.length, 2);
+  sockets[1].disconnect();
+  t.mock.timers.tick(1_999);
+  assert.equal(sockets.length, 2);
+  t.mock.timers.tick(1);
+  assert.equal(sockets.length, 3);
+  ready(sockets[2]);
+  sockets[2].disconnect();
+  t.mock.timers.tick(1_000);
+  assert.equal(sockets.length, 4);
 });

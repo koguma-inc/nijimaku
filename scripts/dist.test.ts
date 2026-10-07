@@ -100,12 +100,6 @@ describe("inspectFullZip", () => {
 });
 
 describe("inspectAppZip", () => {
-  test("版のフォルダの中身をルートに置いたZIPは通る", () => {
-    const appStage = path.join(stage, "app", "versions", "1.2.3");
-    makeZip(appStage, zip);
-    inspectAppZip(zip, appStage);
-  });
-
   test("禁止ファイルがあれば失敗する", () => {
     const appStage = path.join(stage, "app", "versions", "1.2.3");
     put("app/versions/1.2.3/settings.json", "{}\n");

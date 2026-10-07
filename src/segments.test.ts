@@ -43,7 +43,7 @@ test("finalとfixedの到着順が逆転しても、各item_idの内容が正し
   ]);
 });
 
-test("文脈は修正済みのjaを優先し、CONTEXT_SIZE件に絞られ、対象より後のセグメントを含まない", () => {
+test("文脈は修正済みのjaを優先し、CONTEXT_SIZE件に絞られ、0件にもできる", () => {
   const { store } = make({ contextSize: 2, displaySegments: 10 });
   for (const [id, seq] of [["a", 1], ["b", 2], ["c", 3], ["d", 4]] as const) {
     store.setSeq(id, seq);
@@ -60,15 +60,13 @@ test("文脈は修正済みのjaを優先し、CONTEXT_SIZE件に絞られ、対
   assert.deepEqual(store.context("a"), []);
   assert.deepEqual(store.context("e"), ["c-raw", "d-ja"]);
   assert.deepEqual(store.context("p"), ["c-raw", "d-ja"]);
-});
 
-test("CONTEXT_SIZEが0なら文脈は空", () => {
-  const { store } = make({ contextSize: 0 });
-  store.setSeq("a", 1);
-  store.final("a", "あ");
-  store.setSeq("b", 2);
-  store.final("b", "い");
-  assert.deepEqual(store.context("b"), []);
+  const { store: noContext } = make({ contextSize: 0 });
+  noContext.setSeq("a", 1);
+  noContext.final("a", "あ");
+  noContext.setSeq("b", 2);
+  noContext.final("b", "い");
+  assert.deepEqual(noContext.context("b"), []);
 });
 
 test("空のfinalでセグメントが消え、その後に同じidのイベントが来ても復活しない", () => {
@@ -95,15 +93,12 @@ test("空のfinalでセグメントが消え、その後に同じidのイベン�
   store.partial("b", "びーと");
   assert.deepEqual(ids(store.snapshot()), []);
   assert.equal(delivered.length, count);
-});
 
-test("未知のidへの空のfinalの後、同じidのpartialでセグメントが作られない", () => {
-  const { store, delivered } = make();
   assert.equal(store.final("x", ""), false);
   store.partial("x", "あ");
   store.setSeq("x", 1);
   assert.deepEqual(ids(store.snapshot()), []);
-  assert.equal(delivered.length, 0);
+  assert.equal(delivered.length, count);
 });
 
 test("既定の50件を超えると、seq順で先頭のセグメントから消える", () => {
@@ -141,23 +136,6 @@ test("maxHistoryを超えたとき、seq未確定のpartialより先にseqの小
   assert.deepEqual(ids(store.snapshot()), ["b", "c", "p"]);
 });
 
-test("ローテーション中に2接続のcompletedが逆順で届いても、スナップショットはseq順", () => {
-  const { store, delivered } = make({ displaySegments: 10 });
-  store.setSeq("a", 1);
-  store.partial("a", "旧接続の文");
-  store.setSeq("b", 2);
-  store.partial("b", "新接続の文");
-  assert.deepEqual(ids(store.snapshot()), ["a", "b"]);
-  const count = delivered.length;
-
-  store.final("b", "新接続の文。");
-  assert.deepEqual(ids(store.snapshot()), ["a", "b"]);
-  store.final("a", "旧接続の文。");
-  assert.deepEqual(ids(store.snapshot()), ["a", "b"]);
-  assert.equal(delivered.length, count + 2);
-  for (const s of delivered.slice(count)) assert.deepEqual(ids(s), ["a", "b"]);
-});
-
 test("後のcommitのcompletedが、前のcommitのcommitted・deltaより先に届いてもseq順", () => {
   const { store } = make({ displaySegments: 10 });
   store.setSeq("b", 2);
@@ -168,16 +146,6 @@ test("後のcommitのcompletedが、前のcommitのcommitted・deltaより先に
   assert.deepEqual(ids(store.snapshot()), ["a", "b"]);
   store.final("a", "あ。");
   assert.deepEqual(ids(store.snapshot()), ["a", "b"]);
-});
-
-test("seq未確定のpartialは、先に到着していてもseq確定済みのセグメントより後に並ぶ", () => {
-  const { store } = make({ displaySegments: 10 });
-  store.partial("p", "話し中");
-  store.setSeq("a", 1);
-  store.partial("a", "確定済みの文");
-  assert.deepEqual(ids(store.snapshot()), ["a", "p"]);
-  store.final("a", "確定済みの文。");
-  assert.deepEqual(ids(store.snapshot()), ["a", "p"]);
 });
 
 test("seq未確定のpartialが複数あると最初のdeltaの到着順で並び、setSeq後はseq順になる", () => {

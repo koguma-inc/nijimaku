@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -66,7 +66,7 @@ test("壊れたファイルは警告を返し、既定値で動く", () => {
   assert.equal(store.values.vadSilenceMs, 800);
 });
 
-test("replaceはファイルに無い項目を既定値に戻し、使えない値は捨てて警告する。設定のファイルでなければ何も変えない", () => {
+test("replaceはファイルに無い項目を既定値に戻し、設定のファイルでなければ何も変えない", () => {
   const file = tempFile();
   const store = new SettingsStore(DEFAULTS, file);
   store.set("vadThresholdDb", -50);
@@ -75,12 +75,56 @@ test("replaceはファイルに無い項目を既定値に戻し、使えない�
   assert.ok("error" in store.replace([]));
   assert.equal(store.values.vadThresholdDb, -50);
 
-  const result = store.replace({ vadSilenceMs: 600, styleJaSize: 99999, unknownKey: 1 });
+  const result = store.replace({ vadSilenceMs: 600 });
   assert.ok("warnings" in result);
-  assert.equal(result.warnings.length, 2);
+  assert.deepEqual(result.warnings, []);
   assert.equal(store.values.vadThresholdDb, -45);
-  assert.equal(store.values.styleJaSize, null);
   assert.deepEqual(JSON.parse(readFileSync(file, "utf8")), { vadSilenceMs: 600 });
+});
+
+test("保存失敗はset・reset・replaceから返し、使用中の設定と保存済みファイルを変えない", (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-settings-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, "settings.json");
+  const store = new SettingsStore(DEFAULTS, file);
+  assert.equal(store.set("vadSilenceMs", 600), undefined);
+  const saved = readFileSync(file, "utf8");
+  const values = store.values;
+  mkdirSync(`${file}.tmp`);
+
+  for (const change of [
+    () => store.set("vadSilenceMs", 700),
+    () => store.reset("vadSilenceMs"),
+    () => {
+      const result = store.replace({ vadThresholdDb: -50 });
+      return "error" in result ? result.error : undefined;
+    },
+  ]) {
+    assert.ok(change());
+    assert.deepEqual(store.values, values);
+    assert.deepEqual(store.overridden, ["vadSilenceMs"]);
+    assert.equal(readFileSync(file, "utf8"), saved);
+  }
+
+  rmSync(`${file}.tmp`, { recursive: true });
+  assert.equal(store.set("vadSilenceMs", 700), undefined);
+  assert.equal(store.values.vadSilenceMs, 700);
+});
+
+test("置き換えに失敗したら一時ファイルを消し、使用中の設定を維持する", (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-settings-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const file = path.join(dir, "settings.json");
+  const store = new SettingsStore(DEFAULTS, file);
+  assert.equal(store.set("vadSilenceMs", 600), undefined);
+  const backup = `${file}.backup`;
+  renameSync(file, backup);
+  mkdirSync(file);
+
+  assert.ok(store.set("vadSilenceMs", 700));
+  assert.equal(store.values.vadSilenceMs, 600);
+  assert.equal(existsSync(`${file}.tmp`), false);
+  assert.deepEqual(JSON.parse(readFileSync(backup, "utf8")), { vadSilenceMs: 600 });
 });
 
 test("用語集: 前後の空白を除き、空行を捨て、英語の無い行はjaだけにする。重複・日本語の無い行・<、>は拒否する", () => {

@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
-import { loadConfig } from "./config.ts";
 import { CredentialsStore } from "./credentials.ts";
 
 function tempFile(t: TestContext): string {
@@ -11,10 +10,6 @@ function tempFile(t: TestContext): string {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   return path.join(dir, "credentials.json");
 }
-
-test("キー未設定でも設定画面を起動するための構成を読み込める", () => {
-  assert.equal(loadConfig({}).openaiApiKey, "");
-});
 
 test("保存したキーは環境変数より優先し、削除後は環境変数へ戻る。画面へ返す状態にはキーを含めない", (t) => {
   const file = tempFile(t);
@@ -36,14 +31,12 @@ test("保存したキーは環境変数より優先し、削除後は環境変�
   assert.equal(reloaded.reset(), undefined);
   assert.equal(reloaded.apiKey, "sk-test-env");
   assert.equal(existsSync(file), false);
-});
 
-test("環境変数がなければ保存したキーの削除後は未設定へ戻る", (t) => {
-  const store = new CredentialsStore(tempFile(t));
-  assert.equal(store.set("sk-test-saved"), undefined);
-  assert.equal(store.reset(), undefined);
-  assert.equal(store.apiKey, "");
-  assert.deepEqual(store.status, { configured: false, saved: false });
+  const withoutFallback = new CredentialsStore(file);
+  assert.equal(withoutFallback.set("sk-test-saved"), undefined);
+  assert.equal(withoutFallback.reset(), undefined);
+  assert.equal(withoutFallback.apiKey, "");
+  assert.deepEqual(withoutFallback.status, { configured: false, saved: false });
 });
 
 test("空・改行・過大なキーを拒否し、使用中のキーやファイルを変更しない", (t) => {
@@ -79,19 +72,18 @@ test("保存できない場合は使用中のキーを維持し、エラーに�
   assert.deepEqual(store.status, { configured: true, saved: false });
 });
 
-test("置き換えが失敗しても旧ファイルとキーを維持し、一時ファイルを残さない", (t) => {
-  if (process.platform === "win32" || process.getuid?.() === 0) return t.skip("Unixのディレクトリ権限で検証する");
+test("置き換えが失敗しても使用中のキーを維持し、一時ファイルを残さない", (t) => {
   const file = tempFile(t);
   const dir = path.dirname(file);
   const store = new CredentialsStore(file);
   assert.equal(store.set("sk-test-original"), undefined);
-  chmodSync(dir, 0o500);
-  try {
-    assert.ok(store.set("sk-test-secret"));
-    assert.equal(store.apiKey, "sk-test-original");
-    assert.equal(JSON.parse(readFileSync(file, "utf8")).openaiApiKey, "sk-test-original");
-    assert.deepEqual(readdirSync(dir), ["credentials.json"]);
-  } finally {
-    chmodSync(dir, 0o700);
-  }
+  rmSync(file);
+  mkdirSync(file);
+
+  const error = store.set("sk-test-secret");
+  assert.ok(error);
+  assert.ok(!error.includes("sk-test-secret"));
+  assert.equal(store.apiKey, "sk-test-original");
+  assert.deepEqual(store.status, { configured: true, saved: true });
+  assert.deepEqual(readdirSync(dir), ["credentials.json"]);
 });

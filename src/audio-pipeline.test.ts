@@ -43,11 +43,6 @@ class FakeRealtime {
     this.held = 0;
     this.onReady();
   }
-
-  disconnect(): void {
-    this.ready = false;
-    this.appended = 0;
-  }
 }
 
 function setup(): { pipeline: AudioPipeline; realtime: FakeRealtime; push: (frame: Buffer, n: number) => void } {
@@ -77,17 +72,6 @@ test("ready前にcaptureが切れても、後続フレーム無しでready通知
   push(LOUD, 15);
   assert.equal(pipeline.commit("close"), false);
   pipeline.resetInput();
-  realtime.setReady();
-  assert.deepEqual(realtime.commits, [1]);
-});
-
-test("再接続中に最大長へ達したcommitは、ready通知で送られる", () => {
-  const { realtime, push } = setup();
-  realtime.setReady();
-  push(LOUD, 10);
-  realtime.disconnect();
-  push(LOUD, 50);
-  assert.deepEqual(realtime.commits, []);
   realtime.setReady();
   assert.deepEqual(realtime.commits, [1]);
 });

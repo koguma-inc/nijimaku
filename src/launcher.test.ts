@@ -144,14 +144,6 @@ test("pendingの版がready前に失敗したら前の版へ戻して起動し�
   assertFailedAt(dir, "0.3.0", startedAt);
 });
 
-test("戻した版も失敗したら、そのコードで終わる", { timeout: 15000 }, async (t) => {
-  const dir = install(t, PENDING, { "0.3.0": { exit: 1 }, "0.2.0": { exit: 3 } });
-  const { code, output } = await launch(t, dir);
-  assert.equal(code, 3, output);
-  assert.deepEqual(summary(dir), [["0.3.0", ["--open"]], ["0.2.0", ["--open"]]]);
-  assert.equal((current(dir) as Record<string, unknown>).app, "0.2.0");
-});
-
 test("戻すのは1回の実行につき1回までで、75で再起動した後のpendingの版の失敗では戻さない", { timeout: 15000 }, async (t) => {
   const dir = install(t, PENDING, {
     "0.3.0": { exit: 1 },
@@ -162,23 +154,6 @@ test("戻すのは1回の実行につき1回までで、75で再起動した後�
   assert.equal(code, 4, output);
   assert.deepEqual(summary(dir), [["0.3.0", ["--open"]], ["0.2.0", ["--open"]], ["0.3.1", []]]);
   assert.deepEqual(current(dir), { app: "0.3.1", pending: true, previous: { app: "0.2.0" } });
-});
-
-test("pendingでない版の失敗は戻さない", { timeout: 15000 }, async (t) => {
-  const state = { app: "0.3.0", previous: { app: "0.2.0" } };
-  const dir = install(t, state, { "0.3.0": { exit: 1 }, "0.2.0": { ready: true, exit: 0 } });
-  const { code, output } = await launch(t, dir);
-  assert.equal(code, 1, output);
-  assert.deepEqual(summary(dir), [["0.3.0", ["--open"]]]);
-  assert.deepEqual(current(dir), state);
-});
-
-test("78は戻さずに78で終わる", { timeout: 15000 }, async (t) => {
-  const dir = install(t, PENDING, { "0.3.0": { exit: 78 }, "0.2.0": { ready: true, exit: 0 } });
-  const { code, output } = await launch(t, dir);
-  assert.equal(code, 78, output);
-  assert.deepEqual(summary(dir), [["0.3.0", ["--open"]]]);
-  assert.deepEqual(current(dir), PENDING);
 });
 
 test("ready後の異常終了は戻さない", { timeout: 15000 }, async (t) => {

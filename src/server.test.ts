@@ -6,7 +6,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import WebSocket from "ws";
+import WebSocket, { WebSocketServer } from "ws";
 
 const ROOT = path.join(import.meta.dirname, "..");
 
@@ -25,6 +25,26 @@ function copyApp(dir: string): void {
   cpSync(path.join(ROOT, "public"), path.join(dir, "public"), { recursive: true });
   copyFileSync(path.join(ROOT, "package.json"), path.join(dir, "package.json"));
   symlinkSync(path.join(ROOT, "node_modules"), path.join(dir, "node_modules"), "junction");
+}
+
+function inbox(socket: WebSocket) {
+  const messages: Record<string, unknown>[] = [];
+  const pending: Record<string, unknown>[] = [];
+  let notify = () => {};
+  socket.on("message", (raw) => {
+    const message = JSON.parse(raw.toString());
+    messages.push(message);
+    pending.push(message);
+    notify();
+  });
+  async function receive(type: string): Promise<Record<string, unknown>> {
+    for (;;) {
+      const index = pending.findIndex((msg) => msg.type === type);
+      if (index !== -1) return pending.splice(index, 1)[0]!;
+      await new Promise<void>((resolve) => { notify = resolve; });
+    }
+  }
+  return { messages, receive };
 }
 
 // 子プロセスの終了を待ってから一時フォルダを消す。Windowsでは、動いているプロセスの作業フォルダを消せない。
@@ -89,22 +109,7 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
   for (const allowedOrigin of [origin, httpBase, "https://shared.example"]) {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: allowedOrigin } });
     sockets.push(socket);
-    const messages: Record<string, unknown>[] = [];
-    const pending: Record<string, unknown>[] = [];
-    let notify = () => {};
-    socket.on("message", (raw) => {
-      const message = JSON.parse(raw.toString());
-      messages.push(message);
-      pending.push(message);
-      notify();
-    });
-    async function receive(type: string): Promise<Record<string, unknown>> {
-      for (;;) {
-        const index = pending.findIndex((msg) => msg.type === type);
-        if (index !== -1) return pending.splice(index, 1)[0]!;
-        await new Promise<void>((resolve) => { notify = resolve; });
-      }
-    }
+    const { messages, receive } = inbox(socket);
     const initial = await receive("settings");
     const status = await receive("credentials.status");
     assert.equal(status.configured, false);
@@ -117,6 +122,12 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
     socket.send(JSON.stringify({ type: "update.apply" }));
     if (allowedOrigin === "https://shared.example") assert.match(String((await receive("update.error")).message), /PCで開いたページ/);
     else assert.equal((await receive("update.status")).state, "idle");
+
+    if (allowedOrigin !== "https://shared.example") {
+      socket.close();
+      await once(socket, "close");
+      continue;
+    }
 
     socket.send(JSON.stringify({ type: "set", key: "displaySegments", value: 4 }));
     const changed = await receive("settings");
@@ -132,9 +143,153 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
     assert.ok(!JSON.stringify({ messages, output }).includes(secret));
     assert.match(String(error.message), /APIキー/);
     assert.equal(readFileSync(path.join(dir, "credentials.json"), "utf8"), `{"openaiApiKey":"${secret}`);
+
+    socket.send(JSON.stringify({ type: "import", values: { vadSilenceMs: 600, displaySegments: 4 } }));
+    const imported = await receive("settings");
+    assert.equal((imported.values as Record<string, unknown>).vadSilenceMs, 600);
+    assert.deepEqual((await receive("settings.imported")).warnings, []);
+    const settingsFile = path.join(dir, "settings.json");
+    const saved = readFileSync(settingsFile, "utf8");
+    assert.deepEqual(JSON.parse(saved), { vadSilenceMs: 600, displaySegments: 4 });
+
+    mkdirSync(`${settingsFile}.tmp`);
+    socket.send(JSON.stringify({ type: "set", key: "vadSilenceMs", value: 700 }));
+    await Promise.race([
+      receive("settings.error"),
+      once(child, "exit").then(() => { throw new Error("設定の保存失敗でサーバーが終了しました"); }),
+    ]);
+    socket.send(JSON.stringify({ type: "import", values: { vadSilenceMs: 900, displaySegments: 8 } }));
+    await receive("settings.import.error");
+    assert.equal(readFileSync(settingsFile, "utf8"), saved);
+    rmSync(`${settingsFile}.tmp`, { recursive: true });
+    socket.send(JSON.stringify({ type: "set", key: "displaySegments", value: 5 }));
+    const recovered = await receive("settings");
+    assert.equal((recovered.values as Record<string, unknown>).vadSilenceMs, 600);
+    assert.deepEqual(JSON.parse(readFileSync(settingsFile, "utf8")), { vadSilenceMs: 600, displaySegments: 5 });
     socket.close();
     await once(socket, "close");
   }
+});
+
+test("readyで保留commitを送り、入力を置き換える前にcommitし、拒否された設定の読み込みをまとめて戻す", { timeout: 15000 }, async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "nijimaku-server-"));
+  const children: ChildProcess[] = [];
+  const sockets: WebSocket[] = [];
+  const upstream = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  t.after(async () => {
+    await cleanup(dir, children, sockets);
+    await new Promise<void>((resolve, reject) => upstream.close((error) => error ? reject(error) : resolve()));
+  });
+  await once(upstream, "listening");
+  const address = upstream.address();
+  assert.ok(address && typeof address !== "string");
+  const connected = new Promise<{ socket: WebSocket } & ReturnType<typeof inbox>>((resolve) => {
+    upstream.once("connection", (socket) => {
+      sockets.push(socket);
+      resolve({ socket, ...inbox(socket) });
+    });
+  });
+  copyApp(dir);
+  const settingsFile = path.join(dir, "settings.json");
+  const saved = { displaySegments: 4, styleJaColor: "#fff", streamDescription: "before" };
+  writeFileSync(settingsFile, JSON.stringify(saved));
+  // 接続先だけ差し替え、サーバーとRealtimeSessionは実物を通す。
+  writeFileSync(path.join(dir, "test-server.mjs"), `
+import { mock } from "node:test";
+import WebSocket from "ws";
+import { RealtimeSession } from "./src/realtime.ts";
+mock.module("./src/realtime.ts", { namedExports: {
+  RealtimeSession: class extends RealtimeSession {
+    constructor(options, handlers, logger) {
+      super(options, handlers, logger, () => new WebSocket("ws://127.0.0.1:${address.port}"));
+    }
+  }
+} });
+await import("./src/server.ts");
+`);
+  const port = await freePort();
+  const child = spawn(process.execPath, ["--experimental-test-module-mocks", "test-server.mjs"], {
+    cwd: dir,
+    env: { ...process.env, OPENAI_API_KEY: "sk-test-key", PORT: String(port), SAVE_LOGS: "0", NIJIMAKU_DATA_DIR: dir, NIJIMAKU_LAUNCHER: "" },
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+  });
+  children.push(child);
+  let output = "";
+  child.stdout!.on("data", (data) => { output += data; });
+  child.stderr!.on("data", (data) => { output += data; });
+  await Promise.race([
+    once(child, "message"),
+    once(child, "exit").then(() => { throw new Error(`テスト用サーバーが起動前に終了しました: ${output}`); }),
+  ]);
+  const remote = await connected;
+  await remote.receive("session.update");
+  const settings = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: `http://localhost:${port}` } });
+  sockets.push(settings);
+  const { receive } = inbox(settings);
+  await receive("settings");
+
+  const audio = Buffer.alloc(9_600);
+  for (let offset = 0; offset < audio.length; offset += 2) audio.writeInt16LE(8_000, offset);
+  const first = new WebSocket(`ws://127.0.0.1:${port}/ws/capture`);
+  sockets.push(first);
+  await once(first, "open");
+  first.send(audio);
+  first.close();
+  await once(first, "close");
+  while (!output.includes("[capture] #1 切断")) await once(child.stdout!, "data");
+  remote.socket.send(JSON.stringify({ type: "session.updated" }));
+  assert.equal((await remote.receive("input_audio_buffer.commit")).event_id, "commit_1");
+
+  const second = new WebSocket(`ws://127.0.0.1:${port}/ws/capture`);
+  sockets.push(second);
+  await once(second, "open");
+  second.send(audio);
+  // 初回に保持された10フレームと今回の10フレームが、commitの前にすべて送られる。
+  for (let frame = 0; frame < 20; frame++) await remote.receive("input_audio_buffer.append");
+  const boundary = remote.messages.length;
+  const replaced = once(second, "close");
+  const third = new WebSocket(`ws://127.0.0.1:${port}/ws/capture`);
+  sockets.push(third);
+  await once(third, "open");
+  third.send(audio);
+  assert.equal((await remote.receive("input_audio_buffer.commit")).event_id, "commit_2");
+  assert.equal((await replaced)[0], 4001);
+  for (let frame = 0; frame < 10; frame++) await remote.receive("input_audio_buffer.append");
+  assert.deepEqual(remote.messages.slice(boundary).map((message) => message.type), [
+    "input_audio_buffer.commit",
+    ...Array(10).fill("input_audio_buffer.append"),
+  ]);
+
+  settings.send(JSON.stringify({ type: "import", values: { streamDescription: "after", transcribeLanguages: ["en"], displaySegments: 7, micNoiseSuppression: false } }));
+  await receive("settings");
+  await receive("settings.imported");
+  const update = await remote.receive("session.update");
+  remote.socket.send(JSON.stringify({ type: "error", error: { event_id: update.event_id, message: "rejected" } }));
+  const reverted = await receive("settings");
+  await receive("settings.error");
+  assert.deepEqual(JSON.parse(readFileSync(settingsFile, "utf8")), saved);
+  const values = reverted.values as Record<string, unknown>;
+  assert.equal(values.streamDescription, "before");
+  assert.equal(values.displaySegments, 4);
+  assert.equal(values.styleJaColor, "#fff");
+  assert.equal(values.micNoiseSuppression, true);
+  assert.deepEqual(values.transcribeLanguages, ["ja"]);
+  const restored = await remote.receive("session.update");
+  const session = restored.session as { audio: { input: { transcription: { prompt: string } } } };
+  assert.equal(session.audio.input.transcription.prompt, "before");
+
+  settings.send(JSON.stringify({ type: "import", values: { streamDescription: "after", displaySegments: 7 } }));
+  const changed = await receive("settings");
+  await receive("settings.imported");
+  const rejected = await remote.receive("session.update");
+  const beforeFailure = readFileSync(settingsFile, "utf8");
+  mkdirSync(`${settingsFile}.tmp`);
+  remote.socket.send(JSON.stringify({ type: "error", error: { event_id: rejected.event_id, message: "rejected" } }));
+  assert.match(String((await receive("settings.error")).message), /保存できません/);
+  assert.equal(readFileSync(settingsFile, "utf8"), beforeFailure);
+  const observer = new WebSocket(`ws://127.0.0.1:${port}/ws/settings`, { headers: { Origin: `http://localhost:${port}` } });
+  sockets.push(observer);
+  assert.deepEqual((await inbox(observer).receive("settings")).values, changed.values);
 });
 
 // 起動役（src/launcher.ts）から起動されたときの約束

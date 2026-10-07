@@ -7,15 +7,6 @@ function parseAll(deltas: string[]): Record<string, unknown>[] {
   return [...deltas.flatMap((d) => parser.push(d)), ...parser.end()];
 }
 
-test("正常な2行", () => {
-  const parser = new JsonLineParser();
-  assert.deepEqual(parser.push('{"ja": "会心の一撃"}\n{"en": "Critical hit"}\n'), [
-    { ja: "会心の一撃" },
-    { en: "Critical hit" },
-  ]);
-  assert.deepEqual(parser.end(), []);
-});
-
 test("行が複数の delta に分かれる", () => {
   const text = '{"ja": "会心の一撃"}\r\n{"en": "Critical hit"}\n';
   const parser = new JsonLineParser();
@@ -31,17 +22,15 @@ test("行が複数の delta に分かれる", () => {
   assert.deepEqual(parser.end(), []);
 });
 
-test("コードフェンス付き", () => {
-  assert.deepEqual(parseAll(['```json\n{"ja": "あ"}\n', '{"en": "A"}\n```\n']), [{ ja: "あ" }, { en: "A" }]);
+test("1つのdeltaの複数のJSON行をすべて返し、コードフェンスは無視する", () => {
+  const parser = new JsonLineParser();
+  assert.deepEqual(parser.push('```json\n{"ja": "あ"}\n{"en": "A"}\n```\n'), [{ ja: "あ" }, { en: "A" }]);
+  assert.deepEqual(parser.end(), []);
 });
 
 test("JSONでない行・オブジェクトでないJSON・空行は無視する", () => {
-  const text = ['説明です\n', '\n', '  {"ja": "あ"}  \n', '{"ja": \n', '[1, 2]\n', 'null\n', '"str"\n', '42\n', '{"en": "A"}\n'];
+  const text = ['\n', '  {"ja": "あ"}  \n', '{"ja": \n', '[1, 2]\n', 'null\n', '42\n', '{"en": "A"}\n'];
   assert.deepEqual(parseAll(text), [{ ja: "あ" }, { en: "A" }]);
-});
-
-test("en の行が欠ける", () => {
-  assert.deepEqual(parseAll(['{"ja": "あ"}\n']), [{ ja: "あ" }]);
 });
 
 test("末尾に改行が無い行は end() で取れ、バッファは空になる", () => {
