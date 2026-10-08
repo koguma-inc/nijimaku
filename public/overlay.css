@@ -26,6 +26,8 @@
   --nm-side: 48px;
   --nm-max-width: 1200px;
   --nm-pip-bg: #101014;
+  /* カラオケモードで1秒に流す距離 */
+  --nm-ticker-speed: 180px;
   /* 大きさ・太さ・間隔にかける倍率。PiPで縮めるのに使う（位置は倍率をかけずPiP用の値にする） */
   --nm-scale: 1;
 }
@@ -56,12 +58,16 @@
 
 /* 縁取りは輪郭線を字の下に描く（paint-orderがHTMLの文字に効くのはChrome 123以降。OBS 32.xは127）。
    輪郭線は内外に半分ずつ描かれ、内側は字に隠れるので、太さを2倍にする */
-.nm-line {
-  text-wrap: balance;
-  overflow-wrap: anywhere;
+.nm-line,
+.nm-ticker-seg {
   -webkit-text-stroke: calc(var(--nm-stroke-width) * 2 * var(--nm-scale)) var(--nm-stroke-color);
   paint-order: stroke fill;
   text-shadow: 0 0 calc(var(--nm-shadow-blur) * var(--nm-scale)) var(--nm-stroke-color);
+}
+
+.nm-line {
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .nm-ja {
@@ -83,6 +89,37 @@
 
 /* 文字の色を透かすと字の下に描いた縁取りが透けるため、縁取りごと薄くする */
 .nm-seg[data-state="partial"] .nm-ja {
+  opacity: var(--nm-partial-opacity);
+}
+
+/* カラオケモード。1行を画面の幅いっぱいに流す（位置はoverlay.jsのcreateTickerがtransformで動かす）。
+   横だけ切り、縁取りと影が上下にはみ出す分は切らない */
+.nm-ticker {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--nm-bottom);
+  height: calc(var(--nm-ja-size) * var(--nm-scale) * var(--nm-line-height));
+  overflow: clip visible;
+  pointer-events: none;
+  font-family: var(--nm-font-family);
+  font-weight: var(--nm-font-weight);
+  font-size: calc(var(--nm-ja-size) * var(--nm-scale));
+  line-height: var(--nm-line-height);
+  color: var(--nm-ja-color);
+  white-space: nowrap;
+}
+
+.nm-ticker-seg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* 文と文の間隔 */
+  padding-right: 1em;
+  will-change: transform;
+}
+
+.nm-ticker-seg[data-state="partial"] {
   opacity: var(--nm-partial-opacity);
 }
 

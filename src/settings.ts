@@ -9,11 +9,13 @@
 //                      {type: "import", values}（バックアップの読み込み。valuesはsettings.jsonと同じ形）
 //     サーバー→ページ: {type: "settings.imported", warnings} / {type: "settings.import.error", message}
 //   /ws/overlay  サーバー→ページ: {type: "style", vars}（画面で変えたCSS変数だけ）
+//                             {type: "mode", karaoke}（カラオケモードのオン/オフ）
 //   /ws/capture  サーバー→ページ: {type: "capture.config", mic, vadThresholdDb}
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import type { Config } from "./config.ts";
 
-export type Section = "input" | "transcription" | "display";
+// consoleは設定パネルに出さず、画面の「開始」の下に置く項目（描画はcapture.html側）
+export type Section = "input" | "transcription" | "display" | "console";
 
 export type GlossaryEntry = { ja: string; en?: string };
 
@@ -53,6 +55,7 @@ export type Settings = {
   glossary: GlossaryEntry[];
   transcribeLanguages: string[];
   transcribeDelay: string;
+  karaokeMode: boolean;
   displaySegments: number;
 };
 
@@ -76,6 +79,8 @@ export const FIELDS: Field[] = [
   { key: "glossary", section: "transcription", label: "用語集", kind: "glossary", maxItems: 100, maxLength: 100, help: "末尾の空欄に書くと追加されます。日本語は文字起こしの手がかりに使い、英語を入れた語は英訳をその表記に揃えます（英語は空でもかまいません）。" },
   { key: "transcribeLanguages", section: "transcription", label: "話す言語", kind: "list", maxItems: 10, options: TRANSCRIBE_LANGUAGES, featured: ["ja", "en", "ko", "zh"], help: "配信で話す言語です。どれも選ばなければ自動で判定します。" },
   { key: "transcribeDelay", section: "transcription", label: "認識の待ち時間", kind: "select", options: ["minimal", "low", "medium", "high", "xhigh"], help: "長いほど途中経過が遅れ、精度が上がります。" },
+  { key: "karaokeMode", section: "console", label: "カラオケモード（β）", kind: "boolean" },
+  { key: "styleTickerSpeed", section: "display", label: "流れる速さ（カラオケモード）", kind: "px", cssVar: "--nm-ticker-speed", min: 20, max: 1000, help: "1秒に流す距離です。右端の外に文字が溜まると自動で速くなります。" },
   { key: "displaySegments", section: "display", label: "表示する文の数", kind: "number", min: 1, max: 10, step: 1 },
   { key: "styleFont", section: "display", label: "フォント", kind: "font", cssVar: "--nm-font-family", options: ["Noto Sans JP", "Noto Serif JP"], help: "NotoはGoogle Fontsから読み込みます（OBSのPCがインターネットにつながっている必要があります）。" },
   { key: "styleJaSize", section: "display", label: "日本語の文字の大きさ", kind: "px", cssVar: "--nm-ja-size", min: 8, max: 200 },
@@ -112,6 +117,7 @@ export function settingsDefaults(config: Config): Values {
     glossary: [],
     transcribeLanguages: ["ja"],
     transcribeDelay: config.transcribeDelay,
+    karaokeMode: false,
     displaySegments: config.displaySegments,
   };
   for (const f of FIELDS) if ("cssVar" in f) values[f.key] = null;

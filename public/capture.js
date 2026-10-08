@@ -20,6 +20,7 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const deviceSelect = /** @type {HTMLSelectElement} */ ($("cap-device"));
 const startBtn = /** @type {HTMLButtonElement} */ ($("cap-start"));
 const stopBtn = /** @type {HTMLButtonElement} */ ($("cap-stop"));
+const karaokeSwitch = /** @type {HTMLInputElement} */ ($("cap-karaoke"));
 const pipBtn = /** @type {HTMLButtonElement} */ ($("cap-pip"));
 const pipNote = $("cap-pip-note");
 const meterEl = $("cap-meter");
@@ -380,29 +381,39 @@ if ("documentPictureInPicture" in window) {
 
 // --- OBSのURL ---
 
-const overlayUrlInput = /** @type {HTMLInputElement} */ ($("cap-overlay-url"));
-const copyUrlBtn = $("cap-copy-url");
+/**
+ * URLの欄と「コピー」ボタン
+ * @param {HTMLInputElement} input
+ * @param {HTMLElement} button
+ * @param {string} url
+ */
+function setupUrl(input, button, url) {
+  let timer = 0;
+  input.value = url;
+  input.addEventListener("focus", () => input.select());
+  button.addEventListener("click", async () => {
+    let text = "コピーしました";
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // http://localhost以外のhttpではクリップボードを使えない
+      input.focus();
+      text = "選択したURLをコピーしてください";
+    }
+    button.textContent = text;
+    button.classList.add("is-done");
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      button.textContent = "コピー";
+      button.classList.remove("is-done");
+    }, 2000);
+  });
+}
+
 const overlayUrl = new URL("./overlay.html", location.href).href;
-let copyTimer = 0;
-overlayUrlInput.value = overlayUrl;
-overlayUrlInput.addEventListener("focus", () => overlayUrlInput.select());
-copyUrlBtn.addEventListener("click", async () => {
-  let text = "コピーしました";
-  try {
-    await navigator.clipboard.writeText(overlayUrl);
-  } catch {
-    // http://localhost以外のhttpではクリップボードを使えない
-    overlayUrlInput.focus();
-    text = "選択したURLをコピーしてください";
-  }
-  copyUrlBtn.textContent = text;
-  copyUrlBtn.classList.add("is-done");
-  clearTimeout(copyTimer);
-  copyTimer = setTimeout(() => {
-    copyUrlBtn.textContent = "コピー";
-    copyUrlBtn.classList.remove("is-done");
-  }, 2000);
-});
+setupUrl(/** @type {HTMLInputElement} */ ($("cap-overlay-url")), $("cap-copy-url"), overlayUrl);
+// スイッチに関係なく常にカラオケモードで出すURL（歌う場面のシーン用）
+setupUrl(/** @type {HTMLInputElement} */ ($("cap-overlay-karaoke-url")), $("cap-copy-karaoke-url"), `${overlayUrl}?mode=karaoke`);
 
 // --- 版と更新 ---
 
@@ -525,6 +536,7 @@ const settings = mountSettings({
       },
     });
     updatePreview(values, styleVars);
+    karaokeSwitch.checked = values.karaokeMode === true;
   },
   onApp: (info) => {
     appInfo = info;
@@ -539,6 +551,13 @@ const settings = mountSettings({
     updateError = text;
     renderUpdate();
   },
+});
+
+// カラオケモードは設定パネルでなく開始ボタンの下のスイッチで切り替える。送れなければ見た目を戻す
+karaokeSwitch.addEventListener("change", () => {
+  if (settings.set("karaokeMode", karaokeSwitch.checked)) return;
+  karaokeSwitch.checked = !karaokeSwitch.checked;
+  setMessage("サーバーとの接続が切れています。再接続を待ってからもう一度切り替えてください。", true);
 });
 
 if (navigator.mediaDevices) {

@@ -316,6 +316,36 @@
       body.cap-page .cap-halt:hover {
         background: rgba(229, 72, 77, 0.18);
       }
+      body.cap-page .cap-run {
+        display: grid;
+        gap: 10px;
+      }
+      /* 開始ボタンの下のカラオケモードのスイッチ。オンの間は枠を強調して、配信中でも一目で分かるようにする */
+      body.cap-page .cap-karaoke {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        height: 40px;
+        padding: 0 16px;
+        border: 1px solid var(--ui-border);
+        border-radius: 10px;
+        background: var(--ui-raised);
+        color: var(--ui-muted);
+        font-size: var(--ui-fz-s);
+        font-weight: 700;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+      }
+      body.cap-page .cap-karaoke:hover {
+        background: var(--ui-hover);
+      }
+      body.cap-page .cap-karaoke:has(:checked) {
+        border-color: var(--ui-accent);
+        background: var(--ui-accent-soft);
+        color: var(--ui-text);
+      }
 
       body.cap-page .cap-input {
         display: grid;
@@ -487,7 +517,15 @@
       }
       body.cap-page .cap-url {
         display: flex;
+        align-items: center;
         gap: 8px;
+      }
+      body.cap-page .cap-url-name {
+        flex: none;
+        min-width: 6em;
+        color: var(--ui-muted);
+        font-size: var(--ui-fz-s);
+        font-weight: 600;
       }
       body.cap-page .cap-url input {
         flex: 1;
@@ -1000,7 +1038,8 @@
           grid-template-columns: minmax(0, 1fr);
         }
         body.cap-page .cap-go,
-        body.cap-page .cap-halt {
+        body.cap-page .cap-halt,
+        body.cap-page .cap-karaoke {
           width: 100%;
         }
         /* 項目名とリセットボタンを1行目、入力欄を2行目に置く */
@@ -1060,7 +1099,7 @@
 
       <section class="cap-console" id="cap-console" aria-label="音声の入力">
         <div class="cap-console-main">
-          <div>
+          <div class="cap-run">
             <button type="button" class="cap-go" id="cap-start">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.52.86l10.4-6.4a1 1 0 0 0 0-1.72L9.52 4.74A1 1 0 0 0 8 5.6z" fill="currentColor" /></svg>
               開始
@@ -1069,6 +1108,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" /></svg>
               停止
             </button>
+            <label class="cap-karaoke" for="cap-karaoke">
+              <input type="checkbox" class="cap-switch" id="cap-karaoke" role="switch" />
+              <span>カラオケモード（β）</span>
+            </label>
           </div>
           <div class="cap-input">
             <div class="cap-device">
@@ -1107,12 +1150,19 @@
         <div class="cap-output-item">
           <div>
             <h2>OBS用URL</h2>
-            <p class="cap-note">ブラウザソースのURLに入れます。幅と高さは配信の解像度（例: 1920×1080）にします。</p>
+            <p class="cap-note">ブラウザソースのURLに入れます。幅と高さは配信の解像度（例: 1920×1080）にします。「カラオケ固定」は、スイッチに関係なく常にカラオケモードで出ます（歌う場面のシーン用）。</p>
           </div>
           <div class="cap-url">
+            <span class="cap-url-name">通常</span>
             <input type="text" id="cap-overlay-url" readonly spellcheck="false" aria-label="字幕ページのURL" value="./overlay.html" />
             <button type="button" class="cap-btn" id="cap-copy-url">コピー</button>
             <a class="cap-btn" href="./overlay.html" target="_blank" rel="noopener">開く</a>
+          </div>
+          <div class="cap-url">
+            <span class="cap-url-name">カラオケ固定</span>
+            <input type="text" id="cap-overlay-karaoke-url" readonly spellcheck="false" aria-label="常にカラオケモードの字幕ページのURL" value="./overlay.html?mode=karaoke" />
+            <button type="button" class="cap-btn" id="cap-copy-karaoke-url">コピー</button>
+            <a class="cap-btn" href="./overlay.html?mode=karaoke" target="_blank" rel="noopener">開く</a>
           </div>
         </div>
         <div class="cap-output-item">

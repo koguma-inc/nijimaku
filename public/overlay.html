@@ -14,6 +14,8 @@
       // 更新でサーバーの版が変わったら、新しい版のoverlay.js・overlay.cssを読み直す
       const isNewVersion = createVersionWatch();
       mountOverlay(document.getElementById("overlay"), {
+        // ?mode=karaoke は設定に関係なく常に1行で流す表示（歌う場面のブラウザソース用）。無ければ設定に従う
+        mode: new URLSearchParams(location.search).get("mode"),
         onVersion: (version) => {
           if (isNewVersion(version)) location.reload();
         },

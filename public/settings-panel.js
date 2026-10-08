@@ -55,7 +55,7 @@ function setSlider(slider, value) {
 
 /**
  * @param {{card: HTMLElement, message: HTMLElement, onValues: (values: Record<string, unknown>, styleVars: Record<string, string>) => void, onCredentials: (status: any) => void, onApp: (info: any) => void, onUpdate: (status: any) => void, onUpdateError: (message: string) => void}} opts
- * @returns {{applyUpdate: () => boolean}}
+ * @returns {{applyUpdate: () => boolean, set: (key: string, value: unknown) => boolean}} setは画面側が描く項目（カラオケモード）の送信用
  */
 export function mountSettings({ card, message, onValues, onCredentials, onApp, onUpdate, onUpdateError }) {
   /** @type {Map<string, {field: any, input?: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement, widget?: {el: HTMLElement, render: (value: any[]) => void}, reset: HTMLButtonElement, picker?: HTMLInputElement, slider?: HTMLInputElement}>} */
@@ -334,6 +334,7 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
   function build(fields) {
     for (const field of fields) {
       const container = card.querySelector(`.cap-fields[data-section="${field.section}"]`);
+      // 設定パネルに置かない項目（section: console）は画面側が描く
       if (!container) continue;
       const id = `cap-set-${field.key}`;
       const label = document.createElement("label");
@@ -575,5 +576,8 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
   }
 
   connect();
-  return { applyUpdate: () => send({ type: "update.apply" }) };
+  return {
+    applyUpdate: () => send({ type: "update.apply" }),
+    set: (key, value) => send({ type: "set", key, value }),
+  };
 }

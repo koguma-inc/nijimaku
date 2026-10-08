@@ -170,6 +170,10 @@ function styleMessage(): Record<string, unknown> {
   return { type: "style", vars: settingsStore.styleVars() };
 }
 
+function modeMessage(): Record<string, unknown> {
+  return { type: "mode", karaoke: settingsStore.current.karaokeMode };
+}
+
 function revertEntry(key: string): RevertEntry {
   return { key, prev: settingsStore.values[key], wasOverridden: settingsStore.overridden.includes(key) };
 }
@@ -220,8 +224,8 @@ function applySettings(before: Settings): string[] {
   segments.setSentenceSplitMs(s.sentenceSplitMs);
   corrector.setContext(streamContext(s));
   if (current) sendJson(current.ws, captureConfigMessage());
-  const style = JSON.stringify(styleMessage());
-  for (const ws of overlays) if (ws.readyState === WebSocket.OPEN) ws.send(style);
+  broadcastJson(overlays, styleMessage());
+  broadcastJson(overlays, modeMessage());
   const next = transcriptionConfig(s);
   if (JSON.stringify(next) === JSON.stringify(transcriptionConfig(before))) return [];
   return realtime.updateTranscription(next);
@@ -433,6 +437,7 @@ overlayWss.on("connection", (ws: WebSocket) => {
   // overlay.htmlは版が変わったら読み直す（更新後に古いoverlay.js・overlay.cssを使い続けない）
   sendJson(ws, { type: "app", version: APP_VERSION });
   sendJson(ws, styleMessage());
+  sendJson(ws, modeMessage());
   sendJson(ws, segments.snapshot());
   ws.on("close", () => overlays.delete(ws));
   ws.on("error", () => overlays.delete(ws));

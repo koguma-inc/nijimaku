@@ -138,6 +138,14 @@ test(".env・APIキーなしで画面を配信し、許可URLから設定を変�
     assert.equal((reset.values as Record<string, unknown>).displaySegments, (initial.defaults as Record<string, unknown>).displaySegments);
     assert.ok(!Object.hasOwn(JSON.parse(readFileSync(path.join(dir, "settings.json"), "utf8")), "displaySegments"));
 
+    // overlay.htmlとPiPは、接続時にカラオケモードのオン/オフを受けて表示を選ぶ
+    socket.send(JSON.stringify({ type: "set", key: "karaokeMode", value: true }));
+    assert.equal(((await receive("settings")).values as Record<string, unknown>).karaokeMode, true);
+    const karaokeOverlay = new WebSocket(`ws://127.0.0.1:${port}/ws/overlay`);
+    sockets.push(karaokeOverlay);
+    assert.deepEqual(await inbox(karaokeOverlay).receive("mode"), { type: "mode", karaoke: true });
+    karaokeOverlay.close();
+
     socket.send(JSON.stringify({ type: "credentials.set", apiKey: `${secret} invalid` }));
     const error = await receive("credentials.error");
     assert.ok(!JSON.stringify({ messages, output }).includes(secret));
