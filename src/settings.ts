@@ -45,6 +45,7 @@ export type Settings = {
   vadSilenceMs: number;
   vadMinSpeechMs: number;
   vadMaxSegmentMs: number;
+  sentenceSplitMs: number;
   micNoiseSuppression: boolean;
   micAutoGainControl: boolean;
   micEchoCancellation: boolean;
@@ -66,7 +67,8 @@ export const FIELDS: Field[] = [
   { key: "vadThresholdDb", section: "input", label: "発話とみなす音量", kind: "number", min: -80, max: -10, step: 1, unit: "dBFS" },
   { key: "vadSilenceMs", section: "input", label: "文を区切る無音の長さ", kind: "number", min: 100, max: 3000, step: 50, unit: "ms" },
   { key: "vadMinSpeechMs", section: "input", label: "発話とみなす最短の長さ", kind: "number", min: 20, max: 2000, step: 20, unit: "ms" },
-  { key: "vadMaxSegmentMs", section: "input", label: "1文の最大の長さ", kind: "number", min: 3000, max: 60000, step: 1000, unit: "ms", help: "話し続けていても、この長さで区切ります。" },
+  { key: "vadMaxSegmentMs", section: "input", label: "1文の最大の長さ", kind: "number", min: 10000, max: 30000, step: 1000, unit: "ms", help: "話し続けていても、この長さで区切ります。" },
+  { key: "sentenceSplitMs", section: "input", label: "句点で区切るまでの長さ", kind: "number", min: 3000, max: 15000, step: 500, unit: "ms", help: "話し続けていても、前の区切りの後に話し始めてからこの長さが過ぎて句点（。？！）が出たら、そこで区切って英訳します。" },
   { key: "micNoiseSuppression", section: "input", label: "ノイズ抑制（Chrome）", kind: "boolean" },
   { key: "micAutoGainControl", section: "input", label: "自動ゲイン調整（Chrome）", kind: "boolean" },
   { key: "micEchoCancellation", section: "input", label: "エコー除去（Chrome）", kind: "boolean" },
@@ -101,6 +103,8 @@ export function settingsDefaults(config: Config): Values {
     vadSilenceMs: config.vadSilenceMs,
     vadMinSpeechMs: config.vadMinSpeechMs,
     vadMaxSegmentMs: config.vadMaxSegmentMs,
+    // 短い発話は句点があっても1文のまま出し、話し続けて長くなったときだけ区切る（ユーザー判断）
+    sentenceSplitMs: 5000,
     micNoiseSuppression: true,
     micAutoGainControl: true,
     micEchoCancellation: true,

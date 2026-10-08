@@ -114,14 +114,20 @@ for (const line of readLines(logPath)) {
       break;
     }
     case "luna.ja":
-      if (itemId) itemOf(itemId).jaT ??= line.t;
+      if (itemId) {
+        const item = itemOf(itemIdOf(itemId));
+        item.jaT = Math.max(item.jaT ?? line.t, line.t);
+      }
       break;
     case "luna.en":
-      if (itemId) itemOf(itemId).enT ??= line.t;
+      if (itemId) {
+        const item = itemOf(itemIdOf(itemId));
+        item.enT = Math.max(item.enT ?? line.t, line.t);
+      }
       break;
     case "luna.error":
       lunaErrorCount += 1;
-      if (itemId) itemOf(itemId).lunaError ??= String(line.reason ?? "?");
+      if (itemId) itemOf(itemIdOf(itemId)).lunaError ??= String(line.reason ?? "?");
       break;
   }
 }
@@ -160,6 +166,7 @@ printTable(
 console.log("");
 console.log("単位はms。*「発話終了→commit」はVADの無音待ちの時間（最後の発話フレームからcommitまで）。");
 console.log("発話開始→partialは発話開始から最初のrt.deltaまで。値が無い項目は「-」。");
+console.log("句点で区切った発話のja・enは、最後に届いた文の時刻。");
 
 // --- 統計 ---
 
@@ -194,6 +201,11 @@ console.log(`  luna.error: ${lunaErrorCount}`);
 if (brokenLines > 0) console.log(`  読み飛ばした行: ${brokenLines}`);
 
 // --- 補助 ---
+
+// 句点で区切った文のセグメントid（item_id#番号）を元のitem_idに戻す
+function itemIdOf(id: string): string {
+  return id.replace(/#\d+$/, "");
+}
 
 function latestSessionLog(): string | undefined {
   const dir = path.join(ROOT, "logs");

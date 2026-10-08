@@ -8,6 +8,7 @@ function make(opts: Partial<SegmentStoreOptions> = {}): { store: SegmentStore; d
   const store = new SegmentStore({
     displaySegments: 3,
     contextSize: 3,
+    sentenceSplitMs: 5000,
     ...opts,
     onSnapshot: (s) => delivered.push(s),
   });
@@ -27,10 +28,10 @@ test("finalとfixedの到着順が逆転しても、各item_idの内容が正し
   store.setSeq("a", 1);
   store.setSeq("b", 2);
   store.setSeq("c", 3);
-  assert.equal(store.final("c", "しー"), true);
-  assert.equal(store.final("a", "えー"), true);
+  assert.ok(store.final("c", "しー"));
+  assert.ok(store.final("a", "えー"));
   store.fixed("c", "シー", "C");
-  assert.equal(store.final("b", "びー"), true);
+  assert.ok(store.final("b", "びー"));
   store.fixed("a", "エー");
   store.fixed("b", "ビー");
   store.fixed("b", "ビー", "B");
@@ -78,23 +79,23 @@ test("空のfinalでセグメントが消え、その後に同じidのイベン�
   assert.deepEqual(ids(store.snapshot()), ["a", "b"]);
 
   const before = delivered.length;
-  assert.equal(store.final("a", ""), false);
+  assert.equal(store.final("a", ""), undefined);
   assert.equal(delivered.length, before + 1);
   assert.deepEqual(ids(store.snapshot()), ["b"]);
 
-  assert.equal(store.final("b", "  "), false);
+  assert.equal(store.final("b", "  "), undefined);
   assert.deepEqual(ids(store.snapshot()), []);
 
   const count = delivered.length;
   store.partial("a", "えーと");
   store.setSeq("a", 3);
-  assert.equal(store.final("a", "えーと"), false);
+  assert.equal(store.final("a", "えーと"), undefined);
   store.fixed("a", "エート");
   store.partial("b", "びーと");
   assert.deepEqual(ids(store.snapshot()), []);
   assert.equal(delivered.length, count);
 
-  assert.equal(store.final("x", ""), false);
+  assert.equal(store.final("x", ""), undefined);
   store.partial("x", "あ");
   store.setSeq("x", 1);
   assert.deepEqual(ids(store.snapshot()), []);
@@ -120,7 +121,7 @@ test("既定の50件を超えると、seq順で先頭のセグメントから消
 
   store.fixed("s1", "修正1");
   store.partial("s1", "文1");
-  assert.equal(store.final("s1", "文1"), false);
+  assert.equal(store.final("s1", "文1"), undefined);
   assert.equal(seg(store.snapshot(), "s1"), undefined);
 });
 
@@ -226,16 +227,16 @@ test("final・fixedは単調で、後から来たイベントで内容が戻ら�
   store.fixed("a", "ア");
   assert.deepEqual(seg(store.snapshot(), "a"), { id: "a", state: "partial", text: "あ" });
 
-  assert.equal(store.final("a", "あい"), true);
+  assert.ok(store.final("a", "あい"));
   let count = delivered.length;
   store.partial("a", "あ");
   assert.equal(delivered.length, count);
-  assert.equal(store.final("a", "あいう"), false);
+  assert.equal(store.final("a", "あいう"), undefined);
   assert.deepEqual(seg(store.snapshot(), "a"), { id: "a", state: "final", text: "あい" });
 
   store.fixed("a", "アイ");
-  assert.equal(store.final("a", "あい"), false);
-  assert.equal(store.final("a", ""), false);
+  assert.equal(store.final("a", "あい"), undefined);
+  assert.equal(store.final("a", ""), undefined);
   store.partial("a", "あ");
   assert.deepEqual(seg(store.snapshot(), "a"), { id: "a", state: "fixed", text: "アイ" });
 
@@ -266,7 +267,7 @@ test("dropPartialsはpartialだけを消し、final・fixedは残す", () => {
   assert.equal(delivered.length, count + 1);
 
   store.partial("p", "途中の続き");
-  assert.equal(store.final("q", "遅れたcompleted"), false);
+  assert.equal(store.final("q", "遅れたcompleted"), undefined);
   assert.deepEqual(ids(store.snapshot()), ["f", "x"]);
 });
 
@@ -299,4 +300,47 @@ test("setDisplaySegmentsで表示件数を変えると、新しい件数のス�
   assert.deepEqual(ids(store.snapshot()), ["c"]);
   store.setDisplaySegments(1);
   assert.equal(delivered.length, count + 1);
+});
+
+test("前の区切りの後の最初の文字からsentenceSplitMs経って届いた句点で区切り、finalでは残りだけを返す", () => {
+  const { store } = make({ displaySegments: 10, sentenceSplitMs: 5000 });
+  store.setSeq("prev", 1);
+  store.final("prev", "前の文。");
+
+  assert.deepEqual(store.partial("a", "はい。", 1000), []);
+  assert.deepEqual(store.partial("a", "はい。それで", 3000), []);
+  assert.deepEqual(store.partial("a", "はい。それでですね。 次", 6000), [{ id: "a", text: "はい。それでですね。" }]);
+  // a#1より後・a#2より前に作られる別のitem。区切った文が作成順ではなくitemごとに並ぶことを確かめる
+  store.partial("b", "別の発話", 7000);
+  // 数え直しの起点は区切った後の最初の文字（6000）。前に届いた句点を後から区切らない
+  assert.deepEqual(store.partial("a", "はい。それでですね。 次です。", 10999), []);
+  assert.deepEqual(store.partial("a", "はい。それでですね。 次です。そして。", 11000), [
+    { id: "a#1", text: "次です。そして。" },
+  ]);
+  store.setSeq("a", 2);
+  store.setSeq("b", 3);
+
+  assert.deepEqual(store.final("a", "はい。それでですね。 次です。そして。最後に"), { id: "a#2", text: "最後に" });
+  assert.deepEqual(ids(store.snapshot()), ["prev", "a", "a#1", "a#2", "b"]);
+  assert.deepEqual(store.context("a#2"), ["前の文。", "はい。それでですね。", "次です。そして。"]);
+});
+
+test("続けて出た句点は同じ文に含め、残りが空のfinalでは何も返さない", () => {
+  const { store } = make({ sentenceSplitMs: 5000 });
+  store.partial("a", "それって", 0);
+  assert.deepEqual(store.partial("a", "それって本当？！", 5000), [{ id: "a", text: "それって本当？！" }]);
+  assert.equal(store.final("a", "それって本当？！"), undefined);
+  assert.deepEqual(ids(store.snapshot()), ["a"]);
+});
+
+test("dropPartialsで、区切った文は残し、文字起こし中の続きだけを消す", () => {
+  const { store } = make({ sentenceSplitMs: 5000 });
+  store.partial("a", "はい", 0);
+  assert.deepEqual(store.partial("a", "はい。続き", 5000), [{ id: "a", text: "はい。" }]);
+  store.dropPartials(["a"]);
+  assert.deepEqual(ids(store.snapshot()), ["a"]);
+
+  assert.deepEqual(store.partial("a", "はい。続きです。", 6000), []);
+  assert.equal(store.final("a", "はい。続きです。"), undefined);
+  assert.deepEqual(ids(store.snapshot()), ["a"]);
 });

@@ -12,7 +12,7 @@ import { CredentialsStore } from "./credentials.ts";
 import { createLogger, createNoopLogger } from "./log.ts";
 import { openBrowser } from "./open-browser.ts";
 import { RealtimeSession, type TranscriptionConfig } from "./realtime.ts";
-import { SegmentStore, type Snapshot } from "./segments.ts";
+import { SegmentStore, type Sentence, type Snapshot } from "./segments.ts";
 import { FIELDS, SettingsStore, settingsDefaults, type Settings } from "./settings.ts";
 import { Updater, type UpdateStatus } from "./update.ts";
 import type { VadOptions } from "./vad.ts";
@@ -70,6 +70,7 @@ const overlays = new Set<WebSocket>();
 const segments = new SegmentStore({
   displaySegments: initial.displaySegments,
   contextSize: config.contextSize,
+  sentenceSplitMs: initial.sentenceSplitMs,
   onSnapshot: broadcastSnapshot,
 });
 
@@ -88,15 +89,21 @@ const corrector = new Corrector(
 );
 corrector.setContext(streamContext(initial));
 
+function translate({ id, text }: Sentence): void {
+  console.log(`[final] ${text}`);
+  corrector.correct(id, text, segments.context(id));
+}
+
 const realtime = new RealtimeSession(
   { apiKey: credentials.apiKey, transcription: transcriptionConfig(initial), rotateMin: config.sessionRotateMin },
   {
-    onPartial: (id, text) => segments.partial(id, text),
+    onPartial: (id, text) => {
+      for (const sentence of segments.partial(id, text)) translate(sentence);
+    },
     onFinal: (id, transcript) => {
-      // 空のfinalはLunaを呼ばずにセグメントを消す（SegmentStore.finalがfalseを返す）
-      if (!segments.final(id, transcript)) return;
-      console.log(`[final] ${transcript}`);
-      corrector.correct(id, transcript, segments.context(id));
+      // 区切った残りが空のfinalはLunaを呼ばずにセグメントを消す（SegmentStore.finalがundefinedを返す）
+      const sentence = segments.final(id, transcript);
+      if (sentence) translate(sentence);
     },
     onCommitted: (seq, id) => segments.setSeq(id, seq),
     onDropped: (ids) => segments.dropPartials(ids),
@@ -210,6 +217,7 @@ function applySettings(before: Settings): string[] {
   const s = settingsStore.current;
   pipeline.setVad(vadOptions(s));
   segments.setDisplaySegments(s.displaySegments);
+  segments.setSentenceSplitMs(s.sentenceSplitMs);
   corrector.setContext(streamContext(s));
   if (current) sendJson(current.ws, captureConfigMessage());
   const style = JSON.stringify(styleMessage());
