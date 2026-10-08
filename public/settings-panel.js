@@ -204,6 +204,7 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
       }
       case "number":
       case "px":
+      case "ratio":
       case "percent": {
         const input = document.createElement("input");
         input.type = "number";
@@ -452,6 +453,7 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
         break;
       case "number":
       case "px":
+      case "ratio":
       case "percent":
         if (raw === "") {
           if (field.kind !== "number") send({ type: "reset", key: field.key });
@@ -490,7 +492,7 @@ export function mountSettings({ card, message, onValues, onCredentials, onApp, o
       if (field.kind === "boolean") /** @type {HTMLInputElement} */ (input).checked = value === true;
       else input.value = format(field, value);
     }
-    if (field.kind === "px" || field.kind === "percent" || field.kind === "color") {
+    if (field.kind === "px" || field.kind === "ratio" || field.kind === "percent" || field.kind === "color") {
       const css = cssDefault(field.cssVar);
       // 未設定でも既定値を入れておき、上下キーでそこから調整できるようにする。単位は欄の右に出すので数字だけ
       let shown = css;

@@ -164,9 +164,11 @@ test("styleVarsは画面で変えたCSS変数だけを返す", () => {
   store.set("styleJaSize", 56);
   store.set("styleJaColor", "#ffeeaa");
   store.set("stylePartialOpacity", 40);
+  assert.equal(store.set("styleLineHeight", 1.45), undefined);
   assert.deepEqual(store.styleVars(), {
     "--nm-ja-size": "56px",
     "--nm-ja-color": "#ffeeaa",
     "--nm-partial-opacity": "0.4",
+    "--nm-line-height": "1.45",
   });
 });

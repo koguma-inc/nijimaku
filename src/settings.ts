@@ -33,6 +33,7 @@ export type Field = Base &
     | { kind: "color"; cssVar: string }
     // percentは0〜100で持ち、CSSには0〜1で渡す
     | { kind: "px" | "percent"; cssVar: string; min: number; max: number }
+    | { kind: "ratio"; cssVar: string; min: number; max: number; step: number }
     // 未設定（null）ならOSのフォント。選べるのはoverlay.cssでGoogle Fontsから読み込むものだけ
     | { kind: "font"; cssVar: string; options: string[] }
   );
@@ -77,6 +78,7 @@ export const FIELDS: Field[] = [
   { key: "styleFont", section: "display", label: "フォント", kind: "font", cssVar: "--nm-font-family", options: ["Noto Sans JP", "Noto Serif JP"], help: "NotoはGoogle Fontsから読み込みます（OBSのPCがインターネットにつながっている必要があります）。" },
   { key: "styleJaSize", section: "display", label: "日本語の文字の大きさ", kind: "px", cssVar: "--nm-ja-size", min: 8, max: 200 },
   { key: "styleEnSize", section: "display", label: "英語の文字の大きさ", kind: "px", cssVar: "--nm-en-size", min: 8, max: 200 },
+  { key: "styleLineHeight", section: "display", label: "行間", kind: "ratio", cssVar: "--nm-line-height", min: 1, max: 2, step: 0.05, help: "文字の大きさに対する行の高さです。日本語・英語に共通で適用します。" },
   { key: "styleEnGap", section: "display", label: "日本語と英語の間隔", kind: "px", cssVar: "--nm-en-gap", min: -10, max: 10, help: "0で標準の行間です。負の値で詰めます。" },
   { key: "styleJaColor", section: "display", label: "日本語の色", kind: "color", cssVar: "--nm-ja-color" },
   { key: "styleEnColor", section: "display", label: "英語の色", kind: "color", cssVar: "--nm-en-color" },
@@ -119,6 +121,7 @@ export function validate(field: Field, value: unknown): Validated {
   switch (field.kind) {
     case "number":
     case "px":
+    case "ratio":
     case "percent": {
       if (typeof value !== "number" || !Number.isFinite(value)) return fail("数値を入れてください");
       if (value < field.min || value > field.max) return fail(`${field.min}〜${field.max}の範囲で入れてください`);
@@ -275,6 +278,7 @@ export class SettingsStore {
       if (value === undefined || value === null) continue;
       if (f.kind === "px") vars[f.cssVar] = `${value}px`;
       else if (f.kind === "percent") vars[f.cssVar] = String(Number(value) / 100);
+      else if (f.kind === "ratio") vars[f.cssVar] = String(value);
       else if (f.kind === "color") vars[f.cssVar] = String(value);
       // Google Fontsを読めないときはOSのフォントで出す
       else if (f.kind === "font") vars[f.cssVar] = `"${value}", var(--nm-font-system)`;
