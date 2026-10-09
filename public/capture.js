@@ -15,6 +15,7 @@ const RT_STATES = {
 };
 const LIVE_LABELS = { off: "停止中", wait: "準備中", on: "LIVE" };
 const TAB_STORAGE_KEY = "nijimaku.captureTab";
+const DEVICE_STORAGE_KEY = "nijimaku.captureDevice";
 
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const deviceSelect = /** @type {HTMLSelectElement} */ ($("cap-device"));
@@ -100,14 +101,33 @@ function updateButtons() {
   updateLive();
 }
 
+// 前回選んだマイク（空は既定のマイク）。一覧に無くても消さず、つなぎ直したときに戻す
+let savedDevice = "";
+try {
+  savedDevice = localStorage.getItem(DEVICE_STORAGE_KEY) ?? "";
+} catch {
+  // 読めなければ既定のマイク
+}
+
+deviceSelect.addEventListener("change", () => {
+  savedDevice = deviceSelect.value;
+  try {
+    localStorage.setItem(DEVICE_STORAGE_KEY, savedDevice);
+  } catch {
+    // 保存できなくても選べる
+  }
+});
+
 async function refreshDevices() {
   if (!navigator.mediaDevices) return;
   const devices = await navigator.mediaDevices.enumerateDevices();
   // 許可前はdeviceIdが空のエントリしか返らない
   const inputs = devices.filter((d) => d.kind === "audioinput" && d.deviceId);
-  const selected = deviceSelect.value;
+  // 開始中は実際に使っているマイクを保つ（許可後に初めて一覧に出た保存値へ表示だけ変えない）
+  const selected = audio === null ? savedDevice : deviceSelect.value;
   deviceSelect.length = 1;
   inputs.forEach((d, i) => deviceSelect.add(new Option(d.label || `マイク ${i + 1}`, d.deviceId)));
+  // exactで指定するので、一覧に無いIDは選ばない（開始に失敗する）
   if ([...deviceSelect.options].some((o) => o.value === selected)) deviceSelect.value = selected;
 }
 
