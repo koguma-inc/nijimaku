@@ -68,10 +68,10 @@ const TRANSCRIBE_LANGUAGES = ["af", "ar", "az", "be", "bg", "bs", "ca", "cs", "c
 // 用語集の件数はnekote-voiceで100件まで通ったことの確認だけで、公式の上限ではない
 export const FIELDS: Field[] = [
   { key: "vadThresholdDb", section: "input", label: "発話とみなす音量", kind: "number", min: -80, max: -10, step: 1, unit: "dBFS" },
-  { key: "vadSilenceMs", section: "input", label: "文を区切る無音の長さ", kind: "number", min: 100, max: 3000, step: 50, unit: "ms" },
-  { key: "vadMinSpeechMs", section: "input", label: "発話とみなす最短の長さ", kind: "number", min: 20, max: 2000, step: 20, unit: "ms" },
-  { key: "vadMaxSegmentMs", section: "input", label: "1文の最大の長さ", kind: "number", min: 10000, max: 30000, step: 1000, unit: "ms", help: "話し続けていても、この長さで区切ります。" },
-  { key: "sentenceSplitMs", section: "input", label: "句点で区切るまでの長さ", kind: "number", min: 3000, max: 15000, step: 500, unit: "ms", help: "話し続けていても、前の区切りの後に話し始めてからこの長さが過ぎて句点（。？！）が出たら、そこで区切って英訳します。" },
+  { key: "vadMinSpeechMs", section: "input", label: "発話とみなす最短の時間", kind: "number", min: 20, max: 2000, step: 20, unit: "ms", help: "これより短い音は、物音とみなして無視します。" },
+  { key: "vadSilenceMs", section: "input", label: "無音で区切るまでの時間", kind: "number", min: 100, max: 3000, step: 50, unit: "ms", help: "話した後、この時間だけ無音が続いたら区切ります。短くすると訳が早く出ますが、息継ぎで細切れになりやすくなります。" },
+  { key: "sentenceSplitMs", section: "input", label: "句点で区切るまでの時間", kind: "number", min: 3000, max: 15000, step: 500, unit: "ms", help: "前の区切りから話し続けてこの時間を超えたら、次に出た句点・疑問符・感嘆符（。？！）で文を区切ります。" },
+  { key: "vadMaxSegmentMs", section: "input", label: "強制的に区切るまでの時間", kind: "number", min: 10000, max: 30000, step: 1000, unit: "ms", help: "無音で区切れないまま話し続けても、話し始めからこの時間で区切ります。句点で区切っても数え直しません。単語の途中で切れることがあります。" },
   { key: "micNoiseSuppression", section: "input", label: "ノイズ抑制（Chrome）", kind: "boolean" },
   { key: "micAutoGainControl", section: "input", label: "自動ゲイン調整（Chrome）", kind: "boolean" },
   { key: "micEchoCancellation", section: "input", label: "エコー除去（Chrome）", kind: "boolean" },
