@@ -73,6 +73,8 @@ export function createSubs(container) {
 
 // カラオケモードが覚えておく文の数。表示中の文（最大10）と再接続で送り直される分に十分な数
 const TICKER_MEMORY = 200;
+// 届いた文字が右端の外にはみ出した分を引き込む時間の目安（秒）
+const TICKER_CATCH_UP_S = 0.5;
 
 /**
  * カラオケモード用に、スナップショットを「足す文字」に変える。
@@ -119,13 +121,13 @@ export function createTicker(container) {
   let raf = 0;
   let last = win.performance.now();
 
-  // 1秒に流す距離（px）。設定パネルで変えられるので毎フレーム読む。
+  // 文字が届いていない間に1秒に流す距離（px）。設定パネルで変えられるので毎フレーム読む。
   // 倍率はPiPでbody.is-pipが上書きするので、:rootではなく要素から読む
   function speed() {
     const style = win.getComputedStyle(root);
-    const base = parseFloat(style.getPropertyValue("--nm-ticker-speed")) || 180;
+    const base = parseFloat(style.getPropertyValue("--nm-ticker-speed"));
     const scale = parseFloat(style.getPropertyValue("--nm-scale")) || 1;
-    return base * scale;
+    return (Number.isFinite(base) ? base : 60) * scale;
   }
 
   function render(segments) {
@@ -155,9 +157,10 @@ export function createTicker(container) {
     const dt = Math.min(now - last, 100) / 1000;
     last = now;
     const width = root.clientWidth || 1;
-    // 右端の外に溜まった分に応じて速める（1画面分で2倍、上限3倍）。歌う速さと流す速さの差で遅れが溜まり続けないように
+    // 文字が届いていない間は設定の速さで緩く流し、届いた文字が右端の外にはみ出した分は約0.5秒で引き込む。
+    // 一定の速さで流すと、歌う速さに追いつけない分がそのまま文と文の間の隙間になる
     const end = tail ? tail.x + tail.el.offsetWidth : 0;
-    const dx = speed() * (1 + Math.min(Math.max(end - width, 0) / width, 2)) * dt;
+    const dx = speed() * dt + Math.max(0, end - width) * Math.min(1, dt / TICKER_CATCH_UP_S);
     for (const [id, view] of views) {
       view.x -= dx;
       if (view.x + view.el.offsetWidth < 0) {

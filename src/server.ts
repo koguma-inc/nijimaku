@@ -70,7 +70,7 @@ const overlays = new Set<WebSocket>();
 const segments = new SegmentStore({
   displaySegments: initial.displaySegments,
   contextSize: config.contextSize,
-  sentenceSplitMs: initial.sentenceSplitMs,
+  sentenceSplitMs: sentenceSplitMs(initial),
   onSnapshot: broadcastSnapshot,
 });
 
@@ -128,6 +128,11 @@ const settingsClients = new Set<WebSocket>();
 type RevertEntry = { key: string; prev: unknown; wasOverridden: boolean };
 type Revert = { entries: RevertEntry[]; done: boolean };
 const pendingUpdates = new Map<string, Revert>();
+
+// カラオケモードは英訳を分けて出さないので、句点では区切らない
+function sentenceSplitMs(s: Settings): number {
+  return s.karaokeMode ? Infinity : s.sentenceSplitMs;
+}
 
 function vadOptions(s: Settings): VadOptions {
   return {
@@ -221,7 +226,7 @@ function applySettings(before: Settings): string[] {
   const s = settingsStore.current;
   pipeline.setVad(vadOptions(s));
   segments.setDisplaySegments(s.displaySegments);
-  segments.setSentenceSplitMs(s.sentenceSplitMs);
+  segments.setSentenceSplitMs(sentenceSplitMs(s));
   corrector.setContext(streamContext(s));
   if (current) sendJson(current.ws, captureConfigMessage());
   broadcastJson(overlays, styleMessage());
